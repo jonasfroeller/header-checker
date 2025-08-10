@@ -114,13 +114,22 @@ class SecurityHeaderAnalyzer {
                 })
             });
 
-            const data = await response.json();
+            const contentType = response.headers.get('content-type') || '';
+            let data = null;
+            if (contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                data = { error: 'Non-JSON response', message: text, status: response.status };
+            }
 
             if (response.ok) {
                 this.displayResults(data);
                 this.updateShareLink(data.url || url);
             } else {
-                this.showError(data.message || 'Analysis failed');
+                const snippet = (data && data.message) ? String(data.message).slice(0, 240) : 'Analysis failed';
+                const statusInfo = response.status ? ` (HTTP ${response.status})` : '';
+                this.showError(`${snippet}${statusInfo}`);
             }
         } catch (error) {
             this.showError('Network error: ' + error.message);

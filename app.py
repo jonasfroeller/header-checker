@@ -5,6 +5,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 import secrets
 from services.humble_service import HumbleService
 from services.cache_service import CacheService
@@ -236,6 +237,24 @@ def not_found_handler(e):
         'error': 'Not found',
         'message': 'The requested endpoint does not exist'
     }), 404
+
+
+@app.errorhandler(413)
+def request_entity_too_large(e: RequestEntityTooLarge):
+    """Return JSON for payloads exceeding MAX_CONTENT_LENGTH"""
+    return jsonify({
+        'error': 'Request entity too large',
+        'message': 'The request payload exceeds the allowed size.'
+    }), 413
+
+
+@app.errorhandler(HTTPException)
+def handle_http_exception(e: HTTPException):
+    """Return JSON instead of HTML for generic HTTP errors"""
+    return jsonify({
+        'error': e.name or 'HTTP error',
+        'message': e.description or 'An HTTP error occurred'
+    }), getattr(e, 'code', 500)
 
 
 @app.errorhandler(500)

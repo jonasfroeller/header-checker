@@ -341,13 +341,13 @@ html {
 
 /* Error notification styling */
 .error-notification {
-    background: rgba(220, 53, 69, 0.15);
-    border: 1px solid rgba(220, 53, 69, 0.5);
+    background: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.4);
     border-radius: 12px;
-    color: #ffffff;
+    color: var(--bs-body-color);
     padding: 16px;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 4px 20px rgba(220, 53, 69, 0.2);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 20px rgba(220, 53, 69, 0.15);
 }
 
 .error-notification i:first-child {
@@ -356,13 +356,14 @@ html {
 }
 
 .error-notification strong {
-    color: #ffffff;
+    color: var(--bs-danger);
 }
 
 .error-close {
     background: none;
     border: none;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(33, 37, 41, 0.6); /* fallback */
+    color: color-mix(in srgb, var(--bs-body-color) 60%, transparent);
     cursor: pointer;
     padding: 6px;
     border-radius: 4px;
@@ -376,8 +377,8 @@ html {
 }
 
 .error-close:hover {
-    color: #ffffff;
-    background: rgba(255, 255, 255, 0.1);
+    color: var(--bs-body-color);
+    background: rgba(0, 0, 0, 0.06);
 }
 
 .error-close i {
