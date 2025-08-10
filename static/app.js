@@ -9,6 +9,7 @@ class SecurityHeaderAnalyzer {
         this.errorAlert = document.getElementById('errorAlert');
         this.shareBtn = document.getElementById('shareBtn');
         this.currentAnalyzedUrl = null;
+        this.isLoading = false;
 
         this.initializeEventListeners();
         this.initializeSmoothOutlineAnimation();
@@ -90,6 +91,10 @@ class SecurityHeaderAnalyzer {
         const url = this.urlInput.value.trim();
         if (!url) {
             this.showError('Please enter a URL to analyze');
+            return;
+        }
+
+        if (this.isLoading) {
             return;
         }
 
@@ -280,8 +285,12 @@ class SecurityHeaderAnalyzer {
     }
 
     showLoading(show) {
+        this.isLoading = show;
         this.loadingIndicator.style.display = show ? 'block' : 'none';
         this.analyzeBtn.disabled = show;
+        this.analyzeBtn.setAttribute('aria-busy', show ? 'true' : 'false');
+        this.urlInput.disabled = show;
+        this.forceRefresh.disabled = show;
 
         if (show) {
             this.analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Analyzing...';
