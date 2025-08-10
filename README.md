@@ -100,6 +100,38 @@ The Flask app serves both the API and the web UI (from `templates/` and `static/
 
 Then open http://localhost:5000 in your browser.
 
+## Production Deployment
+
+Use uv to install dependencies, then run the app with a production WSGI server (Gunicorn) behind a reverse proxy.
+
+1) Install dependencies (prod)
+
+```bash
+uv sync --frozen --no-dev
+```
+
+2) Run with Gunicorn (Linux)
+
+```bash
+export SESSION_SECRET="<your-strong-secret>"
+gunicorn -w 4 -k gthread -b 0.0.0.0:8000 app:app
+```
+
+3) Reverse proxy (Nginx)
+
+```nginx
+location / {
+  proxy_pass http://127.0.0.1:8000;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Notes:
+- Gunicorn is not supported on Windows; for local Windows use WSL or a Windows-friendly server (e.g., waitress). For real prod, prefer Linux.
+- Set `SESSION_SECRET` in production.
+
 ### Install dependencies (first run)
 
 If you don't use `uv`, install the minimal runtime deps with pip:
