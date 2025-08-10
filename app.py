@@ -138,6 +138,12 @@ def health_check():
 def clear_cache():
     """Clear the analysis cache"""
     try:
+        is_dev_mode = app.debug or os.environ.get('FLASK_ENV') == 'development' or os.environ.get('REPL_SLUG')
+        if not is_dev_mode:
+            return jsonify({
+                'error': 'Forbidden',
+                'message': 'Cache clearing is disabled in production'
+            }), 403
         cache_service.clear()
         return jsonify({
             'message': 'Cache cleared successfully'
