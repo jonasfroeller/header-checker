@@ -195,6 +195,18 @@ pre {
     border-left: 4px solid var(--bs-success);
 }
 
+/* Normalize text/link colors inside alerts */
+.alert p,
+.alert span,
+.alert small,
+.alert a,
+.alert code,
+.alert li {
+    color: var(--bs-body-color);
+}
+
+.alert a { color: inherit; }
+
 /* Header status styling */
 .border-warning {
     border-left: 4px solid var(--bs-warning) !important;
@@ -357,6 +369,20 @@ html {
 
 .error-notification strong {
     color: var(--bs-danger);
+}
+
+.error-notification p,
+.error-notification span,
+.error-notification small,
+.error-notification a,
+.error-notification code,
+.error-notification li {
+    color: var(--bs-body-color);
+}
+
+.error-notification a {
+    color: inherit;
+    text-decoration: underline;
 }
 
 .error-close {
