@@ -230,9 +230,9 @@ footer {
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .security-grade {
-        width: 50px;
-        height: 50px;
-        font-size: 1.25rem;
+        width: 84px;
+        height: 84px;
+        font-size: 1.6rem;
     }
     
     .display-4 {

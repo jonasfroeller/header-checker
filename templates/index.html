@@ -48,7 +48,7 @@
             title="API Documentation"
           >
             <i class="fas fa-book me-1"></i>
-            API
+            <span class="d-none d-sm-inline">API</span>
           </a>
           <button
             type="button"
@@ -57,7 +57,7 @@
             title="Health Check"
           >
             <i class="fas fa-heartbeat me-1"></i>
-            Health
+            <span class="d-none d-sm-inline">Health</span>
           </button>
           {% if is_dev_mode %}
           <a
@@ -67,7 +67,7 @@
             title="Clear Cache"
           >
             <i class="fas fa-trash-alt me-1"></i>
-            Clear Cache
+            <span class="d-none d-sm-inline">Clear Cache</span>
           </a>
           {% endif %}
           <a
@@ -123,64 +123,64 @@
 
         <!-- URL Input Form -->
         <div>
-          <div class="mx-auto" style="max-width: 880px;">
-            <div class="card shadow">
-              <div class="card-body">
-                <form id="analyzeForm">
-                  <div class="mb-3">
-                    <label for="urlInput" class="form-label">
-                      <i class="fas fa-link me-2"></i>
-                      URL to Analyze
-                    </label>
-                    <div class="input-group">
-                      <input
-                        type="url"
-                        class="form-control form-control-lg"
-                        id="urlInput"
-                        placeholder="https://example.com"
-                        value="{% if shared_url %}{{ shared_url }}{% endif %}"
-                        required
-                      />
-                      <button
-                        class="btn btn-primary btn-lg"
-                        type="submit"
-                        id="analyzeBtn"
-                      >
-                        <i class="fas fa-search me-2"></i>
-                        Analyze
-                      </button>
+          <div class="row justify-content-center">
+            <div class="col-12 col-lg-10 col-xl-8">
+              <div class="card shadow">
+                <div class="card-body">
+                  <form id="analyzeForm">
+                    <div class="mb-3">
+                      <label for="urlInput" class="form-label">
+                        <i class="fas fa-link me-2"></i>
+                        URL to Analyze
+                      </label>
+                      <div class="input-group">
+                        <input
+                          type="url"
+                          class="form-control form-control-lg"
+                          id="urlInput"
+                          placeholder="https://example.com"
+                          value="{% if shared_url %}{{ shared_url }}{% endif %}"
+                          required
+                        />
+                        <button
+                          class="btn btn-primary btn-lg"
+                          type="submit"
+                          id="analyzeBtn"
+                        >
+                          <i class="fas fa-search me-2"></i>
+                          Analyze
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <div class="form-check">
-                    <input
-                      class="form-check-input"
-                      type="checkbox"
-                      id="forceRefresh"
-                    />
-                    <label class="form-check-label" for="forceRefresh">
-                      Force refresh (ignore cache)
-                    </label>
-                  </div>
-                </form>
+                    <div class="form-check">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="forceRefresh"
+                      />
+                      <label class="form-check-label" for="forceRefresh">
+                        Force refresh (ignore cache)
+                      </label>
+                    </div>
+                  </form>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Loading Indicator -->
-        <div
-          id="loadingIndicator"
-          class="row justify-content-center mt-4"
-          style="display: none"
-        >
-          <div class="col-auto">
-            <div class="card">
-              <div class="card-body">
-                <div class="d-flex align-items-center justify-content-center">
-                  <div class="spinner-border text-primary me-3" role="status">
-                    <span class="visually-hidden">Loading...</span>
+        <div id="loadingIndicator" class="mt-4" style="display: none">
+          <div class="row justify-content-center">
+            <div class="col-12 col-lg-10 col-xl-8">
+              <div class="card">
+                <div class="card-body">
+                  <div class="d-flex align-items-center justify-content-center">
+                    <div class="spinner-border text-primary me-3" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span>Analyzing security headers...</span>
                   </div>
-                  <span>Analyzing security headers...</span>
                 </div>
               </div>
             </div>
@@ -191,36 +191,48 @@
         <div id="resultsSection" class="mt-4" style="display: none">
           <!-- Summary Card -->
           <div id="results">
-            <div class="mx-auto" style="max-width: 880px;">
-              <div class="card shadow mb-4">
-                <div class="card-body p-4">
-                  <div class="row align-items-center gx-0">
-                    <div class="col-md-8 pe-3">
-                      <h5 class="card-title mb-1 d-flex align-items-center gap-2">
-                        <i class="fas fa-info-circle"></i>
-                        <span>Analysis Summary</span>
-                        <span class="badge bg-info badge-sm ms-2 align-self-end" id="cacheStatus"></span>
-                      </h5>
-                      <p class="card-text text-muted mb-0" id="summaryText"></p>
-                    </div>
-                    <div class="col-md-4 text-end ps-3">
-                      <div
-                        class="d-flex justify-content-end align-items-center"
-                      >
-                        <div class="me-3">
-                          <button
-                            class="btn btn-outline-primary btn-sm"
-                            id="shareBtn"
-                            onclick="copyShareLink()"
-                            style="display: none"
-                          >
-                            <i class="fas fa-share-alt me-1"></i>
-                            Copy Share Link
-                          </button>
-                        </div>
-                        <div class="text-end">
-                          <div class="d-inline-flex align-items-end">
-                            <div class="security-grade" id="securityGrade">?</div>
+            <div class="row justify-content-center">
+              <div class="col-12 col-lg-10 col-xl-8">
+                <div class="card shadow mb-4">
+                  <div class="card-body p-4">
+                    <div class="row align-items-center gx-0">
+                      <div class="col-md-8 pe-3">
+                        <h5
+                          class="card-title mb-1 d-flex align-items-center gap-2"
+                        >
+                          <i class="fas fa-info-circle"></i>
+                          <span>Analysis Summary</span>
+                          <span
+                            class="badge bg-info badge-sm ms-2 align-self-end"
+                            id="cacheStatus"
+                          ></span>
+                        </h5>
+                        <p
+                          class="card-text text-muted mb-0"
+                          id="summaryText"
+                        ></p>
+                      </div>
+                      <div class="col-md-4 text-end ps-3">
+                        <div
+                          class="d-flex justify-content-end align-items-center"
+                        >
+                          <div class="me-3">
+                            <button
+                              class="btn btn-outline-primary btn-sm"
+                              id="shareBtn"
+                              onclick="copyShareLink()"
+                              style="display: none"
+                            >
+                              <i class="fas fa-share-alt me-1"></i>
+                              Copy Share Link
+                            </button>
+                          </div>
+                          <div class="text-end">
+                            <div class="d-inline-flex align-items-end">
+                              <div class="security-grade" id="securityGrade">
+                                ?
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -233,23 +245,31 @@
 
           <!-- Security Headers Analysis -->
           <div>
-            <div class="mx-auto" style="max-width: 880px;">
-              <div class="card shadow mb-4">
-                <div class="card-body">
-                  <div class="row">
-                    <div class="col-md-6 mb-3 mb-md-0">
-                      <h6 class="mb-3">
-                        <i class="fas fa-check-circle text-success me-2"></i>
-                        Present Headers
-                      </h6>
-                      <div id="presentHeaders"><!-- Populated dynamically --></div>
-                    </div>
-                    <div class="col-md-6">
-                      <h6 class="mb-3">
-                        <i class="fas fa-exclamation-triangle text-warning me-2"></i>
-                        Missing Headers
-                      </h6>
-                      <div id="missingHeaders"><!-- Populated dynamically --></div>
+            <div class="row justify-content-center">
+              <div class="col-12 col-lg-10 col-xl-8">
+                <div class="card shadow mb-4">
+                  <div class="card-body">
+                    <div class="row">
+                      <div class="col-md-6 mb-3 mb-md-0">
+                        <h6 class="mb-3">
+                          <i class="fas fa-check-circle text-success me-2"></i>
+                          Present Headers
+                        </h6>
+                        <div id="presentHeaders">
+                          <!-- Populated dynamically -->
+                        </div>
+                      </div>
+                      <div class="col-md-6">
+                        <h6 class="mb-3">
+                          <i
+                            class="fas fa-exclamation-triangle text-warning me-2"
+                          ></i>
+                          Missing Headers
+                        </h6>
+                        <div id="missingHeaders">
+                          <!-- Populated dynamically -->
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -259,16 +279,18 @@
 
           <!-- Warnings -->
           <div id="warningsSection" style="display: none">
-            <div class="mx-auto" style="max-width: 880px;">
-              <div class="card shadow mb-4">
-                <div class="card-header bg-warning text-dark">
-                  <h6 class="mb-0">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    Warnings & Recommendations
-                  </h6>
-                </div>
-                <div class="card-body" id="warningsList">
-                  <!-- Warnings will be populated here -->
+            <div class="row justify-content-center">
+              <div class="col-12 col-lg-10 col-xl-8">
+                <div class="card shadow mb-4">
+                  <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0">
+                      <i class="fas fa-exclamation-triangle me-2"></i>
+                      Warnings & Recommendations
+                    </h6>
+                  </div>
+                  <div class="card-body" id="warningsList">
+                    <!-- Warnings will be populated here -->
+                  </div>
                 </div>
               </div>
             </div>
@@ -276,32 +298,36 @@
 
           <!-- Raw Data -->
           <div>
-            <div class="mx-auto" style="max-width: 880px;">
-              <div class="card shadow">
-                <div class="card-header position-relative py-3">
-                  <h6 class="mb-0 d-flex align-items-center">
-                    <i class="fas fa-code me-2"></i>
-                    Raw Analysis Data
-                    <div class="position-absolute top-50 translate-middle-y" style="right: 1rem;">
-                      <button
-                        class="btn btn-sm btn-outline-secondary me-2"
-                        onclick="downloadJson()"
-                      >
-                        <i class="fas fa-download me-1"></i>
-                        Download JSON
-                      </button>
-                      <button
-                        class="btn btn-sm btn-outline-secondary"
-                        onclick="copyToClipboard('rawData')"
-                      >
-                        <i class="fas fa-copy me-1"></i>
-                        Copy
-                      </button>
+            <div class="row justify-content-center">
+              <div class="col-12 col-lg-10 col-xl-8">
+                <div class="card shadow">
+                  <div class="card-header py-3">
+                    <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
+                      <h6 class="mb-0 d-flex align-items-center">
+                        <i class="fas fa-code me-2"></i>
+                        Raw Analysis Data
+                      </h6>
+                      <div class="d-flex gap-2">
+                        <button
+                          class="btn btn-sm btn-outline-secondary"
+                          onclick="downloadJson()"
+                        >
+                          <i class="fas fa-download me-1"></i>
+                          Download JSON
+                        </button>
+                        <button
+                          class="btn btn-sm btn-outline-secondary"
+                          onclick="copyToClipboard('rawData')"
+                        >
+                          <i class="fas fa-copy me-1"></i>
+                          Copy
+                        </button>
+                      </div>
                     </div>
-                  </h6>
-                </div>
-                <div class="card-body">
-                  <pre><code id="rawData" class="language-json"></code></pre>
+                  </div>
+                  <div class="card-body">
+                    <pre><code id="rawData" class="language-json"></code></pre>
+                  </div>
                 </div>
               </div>
             </div>
@@ -310,25 +336,27 @@
 
         <!-- Error Alert -->
         <div class="mt-4">
-          <div class="mx-auto" style="max-width: 880px;">
-            <div
-              id="errorAlert"
-              class="error-notification"
-              style="display: none"
-            >
-              <div class="d-flex align-items-center">
-                <i class="fas fa-exclamation-circle me-3"></i>
-                <div>
-                  <strong>Error:</strong>
-                  <span id="errorMessage"></span>
+          <div class="row justify-content-center">
+            <div class="col-12 col-lg-10 col-xl-8">
+              <div
+                id="errorAlert"
+                class="error-notification"
+                style="display: none"
+              >
+                <div class="d-flex align-items-center">
+                  <i class="fas fa-exclamation-circle me-3"></i>
+                  <div>
+                    <strong>Error:</strong>
+                    <span id="errorMessage"></span>
+                  </div>
+                  <button
+                    type="button"
+                    class="error-close ms-auto"
+                    onclick="document.getElementById('errorAlert').style.display='none'"
+                  >
+                    <i class="fas fa-times"></i>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  class="error-close ms-auto"
-                  onclick="document.getElementById('errorAlert').style.display='none'"
-                >
-                  <i class="fas fa-times"></i>
-                </button>
               </div>
             </div>
           </div>
@@ -336,43 +364,87 @@
 
         <!-- API Documentation -->
         <div id="api-docs" class="mt-5">
-          <div class="mx-auto" style="max-width: 880px;">
-            <div class="card shadow">
-              <div class="card-header py-3">
-                <h5 class="mb-0 d-flex align-items-center">
-                  <i class="fas fa-book me-2"></i>
-                  API Documentation
-                </h5>
-              </div>
-              <div class="card-body">
-                <p class="text-muted mb-2">
-                  Base URL: <code id="apiBaseUrl">https://example.com</code>
-                </p>
-                <div class="mb-3">
-                  <h6 class="mb-2"><i class="fas fa-heartbeat me-2"></i>Health</h6>
-                  <pre class="mb-0"><code id="curlHealth" class="language-bash">curl -sS https://example.com/api/health</code></pre>
+          <div class="row justify-content-center">
+            <div class="col-12 col-lg-10 col-xl-8">
+              <div class="card shadow">
+                <div class="card-header py-3">
+                  <h5 class="mb-0 d-flex align-items-center">
+                    <i class="fas fa-book me-2"></i>
+                    API Documentation
+                  </h5>
                 </div>
-                <div class="mb-3">
-                  <h6 class="mb-2"><i class="fas fa-search me-2"></i>Analyze a URL</h6>
-                  <pre class="mb-2"><code id="curlAnalyze" class="language-bash">curl -sS -X POST https://example.com/api/analyze \
+                <div class="card-body">
+                  <p class="text-muted mb-2">
+                    Base URL: <code id="apiBaseUrl">https://example.com</code>
+                  </p>
+                  <div class="mb-3">
+                    <h6 class="mb-2">
+                      <i class="fas fa-heartbeat me-2"></i>Health
+                    </h6>
+                    <pre
+                      class="mb-0"
+                    ><code id="curlHealth" class="language-bash">curl -sS https://example.com/api/health</code></pre>
+                  </div>
+                  <div class="mb-3">
+                    <h6 class="mb-2">
+                      <i class="fas fa-search me-2"></i>Analyze a URL
+                    </h6>
+                    <pre
+                      class="mb-2"
+                    ><code id="curlAnalyze" class="language-bash">curl -sS -X POST https://example.com/api/analyze \
   -H "Content-Type: application/json" \
   -d '{"url":"https://example.com","force_refresh":false}'</code></pre>
-                  <small class="text-muted">Set <code>force_refresh</code> to <code>true</code> to bypass cache.</small>
-                </div>
-                <hr />
-                <div class="mb-3">
-                  <h6 class="mb-2"><i class="fas fa-shield-alt me-2"></i>Security Constraints</h6>
-                  <ul class="small text-muted mb-2">
-                    <li><strong>Schemes</strong>: only <code>http</code> and <code>https</code> are allowed.</li>
-                    <li><strong>Ports</strong>: only <code>80</code> and <code>443</code> are allowed (default or explicit).</li>
-                    <li><strong>Methods used to target</strong>: the service issues <code>HEAD</code> first; a safe <code>GET</code> fallback may be used to read headers without downloading the body.</li>
-                    <li><strong>Redirects</strong>: up to 3 hops; each hop is validated (scheme, port, and that the resolved IP is public).</li>
-                    <li><strong>IP policy</strong>: private, loopback, link-local, multicast, and reserved IPs are blocked (DNS rebinding mitigated per hop).</li>
-                    <li><strong>Proxies</strong>: environment/system proxies are not used for outbound requests.</li>
-                    <li><strong>CORS</strong>: enabled for <code>/api/*</code> with <code>origins: *</code>, methods <code>GET, POST</code>, no credentials.</li>
-                    <li><strong>Rate limits</strong>: global limit is 1 request/second per client; <code>/api/analyze</code> is limited to 60 requests/second per client.</li>
-                  </ul>
-                  <p class="small text-muted mb-0">These constraints help prevent SSRF and keep the service safe and free for public use.</p>
+                    <small class="text-muted"
+                      >Set <code>force_refresh</code> to <code>true</code> to
+                      bypass cache.</small
+                    >
+                  </div>
+                  <hr />
+                  <div class="mb-3">
+                    <h6 class="mb-2">
+                      <i class="fas fa-shield-alt me-2"></i>Security Constraints
+                    </h6>
+                    <ul class="small text-muted mb-2">
+                      <li>
+                        <strong>Schemes</strong>: only <code>http</code> and
+                        <code>https</code> are allowed.
+                      </li>
+                      <li>
+                        <strong>Ports</strong>: only <code>80</code> and
+                        <code>443</code> are allowed (default or explicit).
+                      </li>
+                      <li>
+                        <strong>Methods used to target</strong>: the service
+                        issues <code>HEAD</code> first; a safe
+                        <code>GET</code> fallback may be used to read headers
+                        without downloading the body.
+                      </li>
+                      <li>
+                        <strong>Redirects</strong>: up to 3 hops; each hop is
+                        validated (scheme, port, and that the resolved IP is
+                        public).
+                      </li>
+                      <li>
+                        <strong>IP policy</strong>: private, loopback,
+                        link-local, multicast, and reserved IPs are blocked (DNS
+                        rebinding mitigated per hop).
+                      </li>
+                      <li>
+                        <strong>CORS</strong>: enabled for
+                        <code>/api/*</code> with <code>origins: *</code>,
+                        methods <code>GET, POST</code>, no credentials.
+                      </li>
+                      <li>
+                        <strong>Rate limits</strong>: global limit is 1
+                        request/second per client; <code>/api/analyze</code> is
+                        limited to 60 requests/second per client.
+                      </li>
+                    </ul>
+                    <p class="small text-muted mb-0">
+                      These constraints help prevent SSRF and keep the service
+                      safe and free for public use.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -382,13 +454,15 @@
           (function () {
             try {
               const base = window.location.origin;
-              const apiBaseEl = document.getElementById('apiBaseUrl');
-              const healthEl = document.getElementById('curlHealth');
-              const analyzeEl = document.getElementById('curlAnalyze');
+              const apiBaseEl = document.getElementById("apiBaseUrl");
+              const healthEl = document.getElementById("curlHealth");
+              const analyzeEl = document.getElementById("curlAnalyze");
               if (apiBaseEl) apiBaseEl.textContent = base;
-              if (healthEl) healthEl.textContent = `curl -sS ${base}/api/health`;
-              if (analyzeEl) analyzeEl.textContent = `curl -sS -X POST ${base}/api/analyze \\\n   -H "Content-Type: application/json" \\\n   -d '{"url":"https://example.com","force_refresh":false}'`;
-            } catch (e) { }
+              if (healthEl)
+                healthEl.textContent = `curl -sS ${base}/api/health`;
+              if (analyzeEl)
+                analyzeEl.textContent = `curl -sS -X POST ${base}/api/analyze \\\n   -H "Content-Type: application/json" \\\n   -d '{"url":"https://example.com","force_refresh":false}'`;
+            } catch (e) {}
           })();
         </script>
       </div>

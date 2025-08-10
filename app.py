@@ -3,9 +3,7 @@ import logging
 from flask import Flask, request, jsonify, render_template
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
-from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 import secrets
 from services.humble_service import HumbleService
 from services.cache_service import CacheService
@@ -15,7 +13,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 64 * 1024  # 64KB limit for request bodies
+app.config['MAX_CONTENT_LENGTH'] = 256 * 1024  # 256KB limit for request bodies
 
 _env = (os.environ.get('FLASK_ENV') or '').lower()
 _app_env = (os.environ.get('APP_ENV') or '').lower()
@@ -32,9 +30,11 @@ app.secret_key = _session_secret
 
 _trust_proxy = os.environ.get('TRUST_PROXY', '0') in {'1', 'true', 'yes', 'on'}
 if _trust_proxy:
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-else:
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+    try:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    except Exception as _e:
+        logger.warning(f"ProxyFix unavailable or failed: {_e}")
 
 CORS(app, resources={r"/api/*": {
     "origins": "*",
@@ -240,7 +240,7 @@ def not_found_handler(e):
 
 
 @app.errorhandler(413)
-def request_entity_too_large(e: RequestEntityTooLarge):
+def request_entity_too_large(e):
     """Return JSON for payloads exceeding MAX_CONTENT_LENGTH"""
     return jsonify({
         'error': 'Request entity too large',
@@ -248,13 +248,25 @@ def request_entity_too_large(e: RequestEntityTooLarge):
     }), 413
 
 
-@app.errorhandler(HTTPException)
-def handle_http_exception(e: HTTPException):
-    """Return JSON instead of HTML for generic HTTP errors"""
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Return JSON instead of HTML for generic errors"""
+    status = getattr(e, 'code', 500)
+    name = getattr(e, 'name', 'HTTP error' if status and status !=
+                   500 else 'Internal server error')
+    description = getattr(e, 'description', 'An HTTP error occurred' if status and status !=
+                          500 else 'An unexpected error occurred')
+
+    if status >= 500:
+        try:
+            logger.error(f"Unhandled exception: {e}")
+        except Exception:
+            pass
+
     return jsonify({
-        'error': e.name or 'HTTP error',
-        'message': e.description or 'An HTTP error occurred'
-    }), getattr(e, 'code', 500)
+        'error': name,
+        'message': description
+    }), status
 
 
 @app.errorhandler(500)
