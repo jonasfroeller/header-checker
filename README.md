@@ -5,6 +5,8 @@
 This is a Flask-based web application that provides a web interface and REST API to analyze HTTP security headers. It helps developers and security professionals assess the security posture of web applications.  
 The system is designed as a simple, lightweight service that performs live HTTP header analysis and presents results through a user-friendly web interface with caching and rate limiting capabilities.
 
+![example](./example.png)
+
 ## System Architecture
 
 ### Frontend Architecture
