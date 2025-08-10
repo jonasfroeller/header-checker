@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HTTP Security Header Analyzer</title>
+    <meta
+      name="description"
+      content="Analyze HTTP security headers with a simple web UI and REST API. Get grades, recommendations, and shareable results."
+    />
+    <meta
+      name="keywords"
+      content="http security headers, csp, hsts, x-frame-options, x-content-type-options, referrer-policy, permissions-policy, security analyzer"
+    />
+    <link
+      rel="icon"
+      href="https://avatars.githubusercontent.com/u/121523551?v=4"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link
+      href="{{ url_for('static', filename='style.css') }}"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <!-- Header (light mode) -->
+    <header class="sticky-top bg-light border-bottom">
+      <div
+        class="container d-flex justify-content-between align-items-center py-3"
+      >
+        <div class="h5 mb-0 d-flex align-items-center text-dark">
+          <i class="fas fa-shield-alt me-2 text-primary"></i>
+          HTTP Security Header Analyzer
+        </div>
+        <div class="d-flex align-items-center gap-3">
+          <a
+            href="#"
+            class="text-secondary text-decoration-none"
+            onclick="checkHealth()"
+            title="Health Check"
+          >
+            <i class="fas fa-heartbeat me-1"></i>
+            Health
+          </a>
+          {% if is_dev_mode %}
+          <a
+            href="#"
+            class="text-secondary text-decoration-none"
+            onclick="clearCache()"
+            title="Clear Cache"
+          >
+            <i class="fas fa-trash-alt me-1"></i>
+            Clear Cache
+          </a>
+          {% endif %}
+          <a
+            href="https://github.com/jonasfroeller/json-schema-minimalizer"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-secondary text-decoration-none"
+            title="GitHub"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+            >
+              <path
+                fill="currentColor"
+                fill-rule="evenodd"
+                d="M12 0C5.36 0 0 5.5 0 12.3c0 5.44 3.44 10 8.21 11.7c.597.122.815-.265.815-.59c0-.285-.02-1.26-.02-2.28c-3.34.734-4.04-1.47-4.04-1.47c-.537-1.43-1.33-1.79-1.33-1.79c-1.09-.754.08-.754.08-.754c1.21.082 1.85 1.26 1.85 1.26c1.07 1.87 2.8 1.34 3.5 1.02c.1-.794.418-1.34.756-1.65c-2.66-.285-5.47-1.34-5.47-6.07c0-1.34.477-2.44 1.23-3.3c-.12-.306-.537-1.57.119-3.26c0 0 1.01-.326 3.3 1.26c.979-.269 1.99-.406 3-.407s2.05.143 3 .407c2.29-1.59 3.3-1.26 3.3-1.26c.656 1.69.238 2.95.119 3.26c.776.855 1.23 1.96 1.23 3.3c0 4.73-2.8 5.76-5.49 6.07c.438.387.815 1.12.815 2.28c0 1.65-.02 2.97-.02 3.38c0 .326.22.713.815.591c4.77-1.63 8.21-6.23 8.21-11.7c.02-6.8-5.37-12.3-12-12.3z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main class="min-vh-100 d-flex flex-column">
+      <div class="container mt-4">
+        <!-- Header -->
+        <div class="row">
+          <div class="col-12">
+            <div class="text-center mb-5">
+              <h1 class="display-4 mb-3">
+                <i class="fas fa-shield-alt text-primary me-3"></i>
+                Security Header Analyzer
+              </h1>
+              <p class="lead text-muted">
+                Analyze HTTP security headers with comprehensive scoring (A-F
+                grades)
+              </p>
+              <div class="row justify-content-center mt-3">
+                <div class="col-auto">
+                  <small class="text-muted">
+                    <strong>Scoring:</strong> A (90-100%) • B (80-89%) • C
+                    (70-79%) • D (60-69%) • F (<60%)
+                  </small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- URL Input Form -->
+        <div class="row justify-content-center">
+          <div class="col-lg-8">
+            <div class="card shadow">
+              <div class="card-body">
+                <form id="analyzeForm">
+                  <div class="mb-3">
+                    <label for="urlInput" class="form-label">
+                      <i class="fas fa-link me-2"></i>
+                      URL to Analyze
+                    </label>
+                    <div class="input-group">
+                      <input
+                        type="url"
+                        class="form-control form-control-lg"
+                        id="urlInput"
+                        placeholder="https://example.com"
+                        value="{% if shared_url %}{{ shared_url }}{% endif %}"
+                        required
+                      />
+                      <button
+                        class="btn btn-primary btn-lg"
+                        type="submit"
+                        id="analyzeBtn"
+                      >
+                        <i class="fas fa-search me-2"></i>
+                        Analyze
+                      </button>
+                    </div>
+                  </div>
+                  <div class="form-check">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="forceRefresh"
+                    />
+                    <label class="form-check-label" for="forceRefresh">
+                      Force refresh (ignore cache)
+                    </label>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div
+          id="loadingIndicator"
+          class="row justify-content-center mt-4"
+          style="display: none"
+        >
+          <div class="col-auto">
+            <div class="card">
+              <div class="card-body">
+                <div class="d-flex align-items-center justify-content-center">
+                  <div class="spinner-border text-primary me-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                  <span>Analyzing security headers...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="mt-4" style="display: none">
+          <!-- Summary Card -->
+          <div id="results" class="row">
+            <div class="col-12">
+              <div class="card shadow mb-4">
+                <div class="card-body p-4">
+                  <div class="row align-items-center gx-0">
+                    <div class="col-md-8 pe-3">
+                      <h5 class="card-title mb-1 d-flex align-items-center gap-2">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Analysis Summary</span>
+                        <span class="badge bg-info badge-sm ms-2 align-self-end" id="cacheStatus"></span>
+                      </h5>
+                      <p class="card-text text-muted mb-0" id="summaryText"></p>
+                    </div>
+                    <div class="col-md-4 text-end ps-3">
+                      <div
+                        class="d-flex justify-content-end align-items-center"
+                      >
+                        <div class="me-3">
+                          <button
+                            class="btn btn-outline-primary btn-sm"
+                            id="shareBtn"
+                            onclick="copyShareLink()"
+                            style="display: none"
+                          >
+                            <i class="fas fa-share-alt me-1"></i>
+                            Copy Share Link
+                          </button>
+                        </div>
+                        <div class="text-end">
+                          <div class="d-inline-flex align-items-end">
+                            <div class="security-grade" id="securityGrade">?</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Security Headers Analysis -->
+          <div class="row">
+            <div class="col-lg-6">
+              <div class="card shadow mb-4">
+                <div class="card-header">
+                  <h6 class="mb-0">
+                    <i class="fas fa-check-circle text-success me-2"></i>
+                    Present Headers
+                  </h6>
+                </div>
+                <div class="card-body" id="presentHeaders">
+                  <!-- Present headers will be populated here -->
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="card shadow mb-4">
+                <div class="card-header">
+                  <h6 class="mb-0">
+                    <i
+                      class="fas fa-exclamation-triangle text-warning me-2"
+                    ></i>
+                    Missing Headers
+                  </h6>
+                </div>
+                <div class="card-body" id="missingHeaders">
+                  <!-- Missing headers will be populated here -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Warnings -->
+          <div id="warningsSection" class="row" style="display: none">
+            <div class="col-12">
+              <div class="card shadow mb-4">
+                <div class="card-header bg-warning text-dark">
+                  <h6 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Warnings & Recommendations
+                  </h6>
+                </div>
+                <div class="card-body" id="warningsList">
+                  <!-- Warnings will be populated here -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Raw Data -->
+          <div class="row">
+            <div class="col-12">
+              <div class="card shadow">
+                <div class="card-header position-relative py-3">
+                  <h6 class="mb-0 d-flex align-items-center">
+                    <i class="fas fa-code me-2"></i>
+                    Raw Analysis Data
+                    <div class="position-absolute top-50 translate-middle-y" style="right: 1rem;">
+                      <button
+                        class="btn btn-sm btn-outline-secondary me-2"
+                        onclick="downloadJson()"
+                      >
+                        <i class="fas fa-download me-1"></i>
+                        Download JSON
+                      </button>
+                      <button
+                        class="btn btn-sm btn-outline-secondary"
+                        onclick="copyToClipboard('rawData')"
+                      >
+                        <i class="fas fa-copy me-1"></i>
+                        Copy
+                      </button>
+                    </div>
+                  </h6>
+                </div>
+                <div class="card-body">
+                  <pre><code id="rawData" class="language-json"></code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error Alert -->
+        <div
+          id="errorAlert"
+          class="error-notification mt-4"
+          style="display: none"
+        >
+          <div class="d-flex align-items-center">
+            <i class="fas fa-exclamation-circle me-3"></i>
+            <div>
+              <strong>Error:</strong>
+              <span id="errorMessage"></span>
+            </div>
+            <button
+              type="button"
+              class="error-close ms-auto"
+              onclick="document.getElementById('errorAlert').style.display='none'"
+            >
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer (light mode) -->
+    <footer class="bg-light border-top py-4 mt-5 text-center text-muted">
+      <div
+        class="container d-flex flex-column align-items-center gap-3 gap-sm-0 flex-sm-row justify-content-sm-between"
+      >
+        <div class="d-flex align-items-center gap-2">
+          <img
+            src="https://avatars.githubusercontent.com/u/121523551?v=4"
+            alt="Author"
+            class="rounded-circle"
+            width="24"
+            height="24"
+          />
+          <span>
+            Made by
+            <a
+              href="https://jonasfroeller.is-a.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-decoration-none"
+              >Jonas Fröller</a
+            >
+          </span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <img
+            src="https://merginit.com/favicon.png"
+            alt="Imprint"
+            width="24"
+            height="24"
+          />
+          <a
+            href="https://merginit.com/legal/imprint"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-decoration-none"
+            >Imprint</a
+          >
+        </div>
+      </div>
+    </footer>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>

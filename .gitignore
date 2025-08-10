@@ -1,0 +1,70 @@
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Packaging/build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+.coverage.*
+.cache/
+nosetests.xml
+coverage.xml
+htmlcov/
+
+# Type checkers / linters
+.mypy_cache/
+.pytype/
+.ruff_cache/
+.pyre/
+
+# IDE/project settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.*
+!.env.example
+.python-version
+
+# Flask
+instance/
+*.sqlite
+*.db
+
+# Node tool artifacts
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# PEP 582 / local packages cache
+__pypackages__/
+
+# Repository-specific user content
+attached_assets/
+
+.local
