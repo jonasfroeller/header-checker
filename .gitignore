@@ -68,3 +68,5 @@ __pypackages__/
 attached_assets/
 
 .local
+
+deploy-webinoly.sh

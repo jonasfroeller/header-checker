@@ -429,7 +429,25 @@ function downloadJson() {
     showToast('JSON file downloaded', 'success');
 }
 
+let __toastQueue = [];
+let __toastShowing = false;
+
 function showToast(message, type = 'info') {
+    __toastQueue.push({ message, type });
+    if (!__toastShowing) {
+        __processNextToast();
+    }
+}
+
+function __processNextToast() {
+    if (__toastQueue.length === 0) {
+        __toastShowing = false;
+        return;
+    }
+
+    __toastShowing = true;
+    const { message, type } = __toastQueue.shift();
+
     const toast = document.createElement('div');
     toast.className = `toast-notification toast-${type}`;
     toast.style.cssText = 'position: fixed; top: 20px; right: -350px; z-index: 9999; min-width: 320px; max-width: 400px; transition: right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);';
@@ -445,18 +463,17 @@ function showToast(message, type = 'info') {
 
     document.body.appendChild(toast);
     toast.offsetHeight;
+    setTimeout(() => { toast.style.right = '20px'; }, 50);
 
-    setTimeout(() => {
-        toast.style.right = '20px';
-    }, 50);
-
-    setTimeout(() => {
-        hideToast(toast);
-    }, 4000);
+    toast.__autoTimer = setTimeout(() => { hideToast(toast); }, 4000);
 }
 
 function hideToast(toast) {
     if (!toast || !toast.parentNode) return;
+    if (toast.__autoTimer) {
+        clearTimeout(toast.__autoTimer);
+        toast.__autoTimer = null;
+    }
 
     toast.style.right = '-350px';
 
@@ -464,6 +481,8 @@ function hideToast(toast) {
         if (toast.parentNode) {
             toast.parentNode.removeChild(toast);
         }
+        __toastShowing = false;
+        __processNextToast();
     }, 400);
 }
 
