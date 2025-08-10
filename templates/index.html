@@ -361,6 +361,21 @@
   -d '{"url":"https://example.com","force_refresh":false}'</code></pre>
                   <small class="text-muted">Set <code>force_refresh</code> to <code>true</code> to bypass cache.</small>
                 </div>
+                <hr />
+                <div class="mb-3">
+                  <h6 class="mb-2"><i class="fas fa-shield-alt me-2"></i>Security Constraints</h6>
+                  <ul class="small text-muted mb-2">
+                    <li><strong>Schemes</strong>: only <code>http</code> and <code>https</code> are allowed.</li>
+                    <li><strong>Ports</strong>: only <code>80</code> and <code>443</code> are allowed (default or explicit).</li>
+                    <li><strong>Methods used to target</strong>: the service issues <code>HEAD</code> first; a safe <code>GET</code> fallback may be used to read headers without downloading the body.</li>
+                    <li><strong>Redirects</strong>: up to 3 hops; each hop is validated (scheme, port, and that the resolved IP is public).</li>
+                    <li><strong>IP policy</strong>: private, loopback, link-local, multicast, and reserved IPs are blocked (DNS rebinding mitigated per hop).</li>
+                    <li><strong>Proxies</strong>: environment/system proxies are not used for outbound requests.</li>
+                    <li><strong>CORS</strong>: enabled for <code>/api/*</code> with <code>origins: *</code>, methods <code>GET, POST</code>, no credentials.</li>
+                    <li><strong>Rate limits</strong>: global limit is 1 request/second per client; <code>/api/analyze</code> is limited to 60 requests/second per client.</li>
+                  </ul>
+                  <p class="small text-muted mb-0">These constraints help prevent SSRF and keep the service safe and free for public use.</p>
+                </div>
               </div>
             </div>
           </div>

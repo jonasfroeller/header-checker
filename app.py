@@ -4,6 +4,8 @@ from flask import Flask, request, jsonify, render_template
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
+from flask_cors import CORS
+import secrets
 from services.humble_service import HumbleService
 from services.cache_service import CacheService
 from utils.validators import URLValidator
@@ -12,19 +14,80 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.secret_key = os.environ.get(
-    "SESSION_SECRET", "dev-secret-key-change-in-production")
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+app.config['MAX_CONTENT_LENGTH'] = 64 * 1024  # 64KB limit for request bodies
+
+_env = (os.environ.get('FLASK_ENV') or '').lower()
+_app_env = (os.environ.get('APP_ENV') or '').lower()
+_is_production = 'production' in {_env, _app_env}
+_session_secret = os.environ.get("SESSION_SECRET")
+if not _session_secret:
+    _session_secret = secrets.token_urlsafe(32)
+    if _is_production:
+        logger.warning(
+            "SESSION_SECRET not set; generated ephemeral secret. "
+            "Sessions/cookies will be invalidated on restart and key must be consistent across replicas."
+        )
+app.secret_key = _session_secret
+
+_trust_proxy = os.environ.get('TRUST_PROXY', '0') in {'1', 'true', 'yes', 'on'}
+if _trust_proxy:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+else:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+CORS(app, resources={r"/api/*": {
+    "origins": "*",
+    "methods": ["GET", "POST"],
+    "allow_headers": ["Content-Type"],
+    "supports_credentials": False
+}})
 
 limiter = Limiter(
     key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"]
+    default_limits=["1 per second"]
 )
 limiter.init_app(app)
 
 humble_service = HumbleService()
 cache_service = CacheService()
 url_validator = URLValidator()
+
+
+@app.after_request
+def add_security_headers(resp):
+    """Add basic security headers for API responses."""
+    resp.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    resp.headers.setdefault('Referrer-Policy', 'no-referrer')
+
+    try:
+        path = request.path or ''
+    except Exception:
+        path = ''
+
+    if path.startswith('/api/'):
+        # Prevent clickjacking of API responses
+        resp.headers.setdefault('X-Frame-Options', 'DENY')
+
+        # Strict cache policy for sensitive API responses
+        resp.headers.setdefault(
+            'Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        resp.headers.setdefault('Pragma', 'no-cache')
+        resp.headers.setdefault('Expires', '0')
+
+        # Lock down powerful browser features
+        resp.headers.setdefault(
+            'Permissions-Policy', 'accelerometer=(), camera=(), microphone=(), geolocation=(), gyroscope=(), magnetometer=(), payment=(), usb=()')
+
+        # Minimal CSP for API responses
+        resp.headers.setdefault(
+            'Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+
+        # Cross-origin resource policy: allow cross-origin fetches
+        resp.headers.setdefault('Cross-Origin-Resource-Policy', 'cross-origin')
+
+        # XSS protection header for legacy scanners/browsers
+        resp.headers.setdefault('X-XSS-Protection', '1; mode=block')
+    return resp
 
 
 @app.route('/')
@@ -37,7 +100,7 @@ def index():
 
 
 @app.route('/api/analyze', methods=['POST'])
-@limiter.limit("10 per minute")
+@limiter.limit("60 per second", override_defaults=True)
 def analyze_url():
     """
     Analyze a URL for HTTP security headers
@@ -138,7 +201,8 @@ def health_check():
 def clear_cache():
     """Clear the analysis cache"""
     try:
-        is_dev_mode = app.debug or os.environ.get('FLASK_ENV') == 'development' or os.environ.get('REPL_SLUG')
+        is_dev_mode = app.debug or os.environ.get(
+            'FLASK_ENV') == 'development' or os.environ.get('REPL_SLUG')
         if not is_dev_mode:
             return jsonify({
                 'error': 'Forbidden',
@@ -185,4 +249,6 @@ def internal_error_handler(e):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    debug_flag = (os.environ.get('FLASK_ENV') == 'development') or bool(
+        os.environ.get('REPL_SLUG'))
+    app.run(host='0.0.0.0', port=5000, debug=debug_flag)

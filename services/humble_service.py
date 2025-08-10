@@ -4,6 +4,8 @@ import socket
 import time
 import requests
 from typing import Dict, Any
+import ipaddress
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +80,7 @@ class HumbleService:
             return False
 
         session = requests.Session()
+        session.trust_env = False  # do not use env/system proxies
         session.headers.update({
             'User-Agent': 'SecurityHeaderAnalyzer/1.0 (HTTP Security Header Checker)'
         })
@@ -149,31 +152,64 @@ class HumbleService:
     def _fetch_headers(self, url: str) -> Dict[str, Any]:
         """Fetch HTTP headers from the given URL"""
         try:
-            # Configure session with timeout and user agent
+            # Prepare session: no proxies, UA set
             session = requests.Session()
+            session.trust_env = False  # avoid env/system proxies
             session.headers.update({
                 'User-Agent': 'SecurityHeaderAnalyzer/1.0 (HTTP Security Header Checker)'
             })
 
-            # Make HEAD request first (faster), fallback to GET if needed
-            try:
-                response = session.head(
-                    url, timeout=self.timeout, allow_redirects=True)
-                headers = dict(response.headers)
-                status_code = response.status_code
-            except requests.RequestException:
-                # Fallback to GET request
-                response = session.get(
-                    url, timeout=self.timeout, allow_redirects=True)
-                headers = dict(response.headers)
-                status_code = response.status_code
+            # Validate initial target
+            parsed = urlparse(url)
+            if not self._is_allowed_port(parsed):
+                return {'success': False, 'error': 'Disallowed port'}
+            if not self._hostname_is_public(parsed.hostname):
+                return {'success': False, 'error': 'Target host is not public'}
 
-            return {
-                'success': True,
-                'headers': headers,
-                'status_code': status_code,
-                'final_url': response.url
-            }
+            # First try HEAD without redirects; then handle up to 3 redirects manually with validation
+            max_redirects = 3
+            current_url = url
+            for _ in range(max_redirects + 1):
+                resp = session.head(current_url, timeout=self.timeout, allow_redirects=False)
+                # If redirect, validate the Location and continue
+                if resp.is_redirect or resp.is_permanent_redirect:
+                    location = resp.headers.get('Location')
+                    if not location:
+                        return {'success': False, 'error': 'Redirect without Location header'}
+                    next_url = requests.compat.urljoin(current_url, location)
+                    parsed_next = urlparse(next_url)
+                    if parsed_next.scheme not in ('http', 'https'):
+                        return {'success': False, 'error': 'Disallowed redirect scheme'}
+                    if not self._is_allowed_port(parsed_next):
+                        return {'success': False, 'error': 'Disallowed redirect port'}
+                    if not self._hostname_is_public(parsed_next.hostname):
+                        return {'success': False, 'error': 'Redirect target is not public'}
+                    current_url = next_url
+                    continue
+
+                # Non-redirect response: OK, we have headers
+                headers = dict(resp.headers)
+                status_code = resp.status_code
+
+                # Some servers may not support HEAD; fallback to safe GET
+                if status_code >= 400:
+                    try:
+                        get_resp = session.get(current_url, timeout=self.timeout, allow_redirects=False, stream=True)
+                        headers = dict(get_resp.headers)
+                        status_code = get_resp.status_code
+                        # Do not download body
+                        get_resp.close()
+                    except requests.RequestException:
+                        pass
+
+                return {
+                    'success': True,
+                    'headers': headers,
+                    'status_code': status_code,
+                    'final_url': current_url
+                }
+
+            return {'success': False, 'error': 'Too many redirects'}
 
         except requests.exceptions.Timeout:
             return {
@@ -394,3 +430,32 @@ class HumbleService:
             return 'D'
         else:
             return 'F'
+
+    # ---- SSRF helpers ----
+    def _hostname_is_public(self, hostname: str) -> bool:
+        """Resolve hostname and ensure all resolved IPs are public (IPv4/IPv6)."""
+        if not hostname:
+            return False
+        try:
+            infos = socket.getaddrinfo(hostname, None)
+        except Exception:
+            return False
+        for _, _, _, _, sockaddr in infos:
+            ip_str = sockaddr[0]
+            try:
+                ip_obj = ipaddress.ip_address(ip_str)
+                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_reserved or ip_obj.is_multicast:
+                    return False
+            except ValueError:
+                return False
+        return True
+
+    def _is_allowed_port(self, parsed) -> bool:
+        """Only allow default ports 80/443 or explicit 80/443."""
+        try:
+            port = parsed.port
+        except ValueError:
+            return False
+        if port is None:
+            return parsed.scheme in ('http', 'https')
+        return port in (80, 443)
