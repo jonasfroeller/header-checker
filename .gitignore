@@ -70,3 +70,5 @@ attached_assets/
 .local
 
 deploy-webinoly.sh
+
+.tools

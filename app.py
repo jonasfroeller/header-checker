@@ -36,8 +36,12 @@ if _trust_proxy:
     except Exception as _e:
         logger.warning(f"ProxyFix unavailable or failed: {_e}")
 
+# Configure CORS origins via env (comma-separated). Defaults to '*' for compatibility.
+_cors_origins_env = os.environ.get('CORS_ORIGINS')
+_cors_origins = [o.strip() for o in _cors_origins_env.split(',')] if _cors_origins_env else "*"
+
 CORS(app, resources={r"/api/*": {
-    "origins": "*",
+    "origins": _cors_origins,
     "methods": ["GET", "POST"],
     "allow_headers": ["Content-Type"],
     "supports_credentials": False
@@ -77,7 +81,7 @@ def add_security_headers(resp):
 
         # Lock down powerful browser features
         resp.headers.setdefault(
-            'Permissions-Policy', 'accelerometer=(), camera=(), microphone=(), geolocation=(), gyroscope=(), magnetometer=(), payment=(), usb=()')
+            'Permissions-Policy', 'accelerometer=(), camera=(), microphone=(), geolocation=(), gyroscope=(), magnetometer=(), payment=(), usb=(), browsing-topics=()')
 
         # Minimal CSP for API responses
         resp.headers.setdefault(
@@ -85,6 +89,22 @@ def add_security_headers(resp):
 
         # Cross-origin resource policy: allow cross-origin fetches
         resp.headers.setdefault('Cross-Origin-Resource-Policy', 'cross-origin')
+
+        # Cross-origin opener policy to isolate browsing context
+        resp.headers.setdefault('Cross-Origin-Opener-Policy', 'same-origin')
+
+        # Disallow Adobe Flash/PDF cross-domain data access
+        resp.headers.setdefault('X-Permitted-Cross-Domain-Policies', 'none')
+
+        # HSTS in production when served over HTTPS (incl. proxied envs)
+        if _is_production:
+            try:
+                _xfp = (request.headers.get('X-Forwarded-Proto') or '').split(',')[0].strip().lower()
+            except Exception:
+                _xfp = ''
+            _is_https = request.is_secure or _xfp == 'https'
+            if _is_https:
+                resp.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
 
         # XSS protection header for legacy scanners/browsers
         resp.headers.setdefault('X-XSS-Protection', '1; mode=block')
@@ -153,7 +173,14 @@ def analyze_url():
         analysis_result = humble_service.analyze(
             normalized_url, try_fallback=try_fallback)
 
-        if analysis_result['success']:
+        if not analysis_result or not isinstance(analysis_result, dict):
+            logger.error("Humble analyze returned no result or invalid result")
+            return jsonify({
+                'error': 'Analysis failed',
+                'message': 'Humble analysis did not return a valid result'
+            }), 500
+
+        if analysis_result.get('success'):
             cache_service.set(normalized_url, analysis_result['data'])
 
             return jsonify({
@@ -164,7 +191,7 @@ def analyze_url():
         else:
             return jsonify({
                 'error': 'Analysis failed',
-                'message': analysis_result['error']
+                'message': analysis_result.get('error') or 'Unknown error'
             }), 500
 
     except Exception as e:

@@ -1,466 +1,568 @@
 class SecurityHeaderAnalyzer {
-    constructor() {
-        this.form = document.getElementById('analyzeForm');
-        this.urlInput = document.getElementById('urlInput');
-        this.analyzeBtn = document.getElementById('analyzeBtn');
-        this.forceRefresh = document.getElementById('forceRefresh');
-        this.loadingIndicator = document.getElementById('loadingIndicator');
-        this.resultsSection = document.getElementById('resultsSection');
-        this.errorAlert = document.getElementById('errorAlert');
-        this.shareBtn = document.getElementById('shareBtn');
-        this.currentAnalyzedUrl = null;
-        this.isLoading = false;
+  constructor() {
+    this.form = document.getElementById("analyzeForm");
+    this.urlInput = document.getElementById("urlInput");
+    this.analyzeBtn = document.getElementById("analyzeBtn");
+    this.forceRefresh = document.getElementById("forceRefresh");
+    this.loadingIndicator = document.getElementById("loadingIndicator");
+    this.resultsSection = document.getElementById("resultsSection");
+    this.errorAlert = document.getElementById("errorAlert");
+    this.shareBtn = document.getElementById("shareBtn");
+    this.currentAnalyzedUrl = null;
+    this.isLoading = false;
 
-        this.initializeEventListeners();
-        this.initializeSmoothOutlineAnimation();
-        this.checkForSharedUrl();
+    this.initializeEventListeners();
+    this.initializeSmoothOutlineAnimation();
+    this.checkForSharedUrl();
+  }
+
+  initializeEventListeners() {
+    this.form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      this.analyzeUrl();
+    });
+  }
+
+  // Smooth outline animation (JS rAF, time-based easing) on native outline
+  initializeSmoothOutlineAnimation() {
+    const cards = document.querySelectorAll(".card");
+
+    const easeInOutCubic = (t) =>
+      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    cards.forEach((el) => {
+      // Baseline visual (balanced)
+      const baseW = 1.5;
+      const baseA = 0.7;
+      const hoverW = 3;
+      const hoverA = 1;
+
+      el.style.outlineStyle = "solid";
+      el.style.outlineOffset = "-1px";
+      el.style.outlineWidth = baseW + "px";
+      el.style.outlineColor = `rgba(206, 212, 218, ${baseA})`;
+
+      let rafId = null;
+      let lastW = baseW;
+      let lastA = baseA;
+      let anim = null; // {start, duration, fromW, fromA, toW, toA}
+
+      const step = (now) => {
+        if (!anim) {
+          rafId = null;
+          return;
+        }
+        const t = Math.min(1, (now - anim.start) / anim.duration);
+        const e = easeInOutCubic(t);
+        const w = anim.fromW + (anim.toW - anim.fromW) * e;
+        const a = anim.fromA + (anim.toA - anim.fromA) * e;
+
+        lastW = w;
+        lastA = a;
+        el.style.outlineWidth = w + "px";
+        el.style.outlineColor = `rgba(206, 212, 218, ${a})`;
+
+        if (t < 1) {
+          rafId = requestAnimationFrame(step);
+        } else {
+          rafId = null;
+        }
+      };
+
+      const animateTo = (toW, toA, duration = 150) => {
+        anim = {
+          start: performance.now(),
+          duration,
+          fromW: lastW,
+          fromA: lastA,
+          toW,
+          toA,
+        };
+
+        if (!rafId) rafId = requestAnimationFrame(step);
+      };
+
+      // Hover/focus: fast in, smooth out
+      el.addEventListener("mouseenter", () => animateTo(hoverW, hoverA, 140));
+      el.addEventListener("focusin", () => animateTo(hoverW, hoverA, 140));
+      el.addEventListener("mouseleave", () => animateTo(baseW, baseA, 160));
+      el.addEventListener("focusout", () => animateTo(baseW, baseA, 160));
+    });
+  }
+
+  async analyzeUrl() {
+    const url = this.urlInput.value.trim();
+    if (!url) {
+      this.showError("Please enter a URL to analyze");
+      return;
     }
 
-    initializeEventListeners() {
-        this.form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.analyzeUrl();
-        });
+    if (this.isLoading) {
+      return;
     }
 
-    // Smooth outline animation (JS rAF, time-based easing) on native outline
-    initializeSmoothOutlineAnimation() {
-        const cards = document.querySelectorAll('.card');
+    this.showLoading(true);
+    this.hideError();
+    this.hideResults();
 
-        const easeInOutCubic = (t) => (t < 0.5)
-            ? 4 * t * t * t
-            : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: url,
+          force_refresh: this.forceRefresh.checked,
+        }),
+      });
 
-        cards.forEach((el) => {
-            // Baseline visual (balanced)
-            const baseW = 1.5;
-            const baseA = 0.7;
-            const hoverW = 3;
-            const hoverA = 1;
+      const contentType = response.headers.get("content-type") || "";
+      let data = null;
+      if (contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = {
+          error: "Non-JSON response",
+          message: text,
+          status: response.status,
+        };
+      }
 
-            el.style.outlineStyle = 'solid';
-            el.style.outlineOffset = '-1px';
-            el.style.outlineWidth = baseW + 'px';
-            el.style.outlineColor = `rgba(206, 212, 218, ${baseA})`;
+      if (response.ok) {
+        this.displayResults(data);
+        this.updateShareLink(data.url || url);
+      } else {
+        const snippet =
+          data && data.message
+            ? String(data.message).slice(0, 240)
+            : "Analysis failed";
+        const statusInfo = response.status ? ` (HTTP ${response.status})` : "";
+        this.showError(`${snippet}${statusInfo}`);
+      }
+    } catch (error) {
+      this.showError("Network error: " + error.message);
+    } finally {
+      this.showLoading(false);
+    }
+  }
 
-            let rafId = null;
-            let lastW = baseW;
-            let lastA = baseA;
-            let anim = null; // {start, duration, fromW, fromA, toW, toA}
-
-            const step = (now) => {
-                if (!anim) { rafId = null; return; }
-                const t = Math.min(1, (now - anim.start) / anim.duration);
-                const e = easeInOutCubic(t);
-                const w = anim.fromW + (anim.toW - anim.fromW) * e;
-                const a = anim.fromA + (anim.toA - anim.fromA) * e;
-
-                lastW = w; lastA = a;
-                el.style.outlineWidth = w + 'px';
-                el.style.outlineColor = `rgba(206, 212, 218, ${a})`;
-
-                if (t < 1) {
-                    rafId = requestAnimationFrame(step);
-                } else {
-                    rafId = null;
-                }
-            };
-
-            const animateTo = (toW, toA, duration = 150) => {
-                anim = {
-                    start: performance.now(),
-                    duration,
-                    fromW: lastW,
-                    fromA: lastA,
-                    toW,
-                    toA
-                };
-
-                if (!rafId) rafId = requestAnimationFrame(step);
-            };
-
-            // Hover/focus: fast in, smooth out
-            el.addEventListener('mouseenter', () => animateTo(hoverW, hoverA, 140));
-            el.addEventListener('focusin', () => animateTo(hoverW, hoverA, 140));
-            el.addEventListener('mouseleave', () => animateTo(baseW, baseA, 160));
-            el.addEventListener('focusout', () => animateTo(baseW, baseA, 160));
-        });
+  displayResults(data) {
+    // Ensure downstream renderers can access the full payload (compat map, etc.)
+    this.currentRawData = data;
+    if (data.url && this.urlInput.value.trim() !== data.url) {
+      this.urlInput.value = data.url;
     }
 
-    async analyzeUrl() {
-        const url = this.urlInput.value.trim();
-        if (!url) {
-            this.showError('Please enter a URL to analyze');
-            return;
-        }
+    const summaryText = document.getElementById("summaryText");
+    summaryText.textContent = `Analysis completed for ${data.url}`;
+    const cacheStatus = document.getElementById("cacheStatus");
+    cacheStatus.textContent = data.cached ? "Cached" : "Fresh";
+    cacheStatus.className = `badge ${data.cached ? "bg-info" : "bg-success"}`;
 
-        if (this.isLoading) {
-            return;
-        }
-
-        this.showLoading(true);
-        this.hideError();
-        this.hideResults();
-
-        try {
-            const response = await fetch('/api/analyze', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    url: url,
-                    force_refresh: this.forceRefresh.checked
-                })
-            });
-
-            const contentType = response.headers.get('content-type') || '';
-            let data = null;
-            if (contentType.includes('application/json')) {
-                data = await response.json();
-            } else {
-                const text = await response.text();
-                data = { error: 'Non-JSON response', message: text, status: response.status };
-            }
-
-            if (response.ok) {
-                this.displayResults(data);
-                this.updateShareLink(data.url || url);
-            } else {
-                const snippet = (data && data.message) ? String(data.message).slice(0, 240) : 'Analysis failed';
-                const statusInfo = response.status ? ` (HTTP ${response.status})` : '';
-                this.showError(`${snippet}${statusInfo}`);
-            }
-        } catch (error) {
-            this.showError('Network error: ' + error.message);
-        } finally {
-            this.showLoading(false);
-        }
-    }
-
-    displayResults(data) {
-        if (data.url && this.urlInput.value.trim() !== data.url) {
-            this.urlInput.value = data.url;
-        }
-
-        const summaryText = document.getElementById('summaryText');
-        summaryText.textContent = `Analysis completed for ${data.url}`;
-        const cacheStatus = document.getElementById('cacheStatus');
-        cacheStatus.textContent = data.cached ? 'Cached' : 'Fresh';
-        cacheStatus.className = `badge ${data.cached ? 'bg-info' : 'bg-success'}`;
-
-        const securityGrade = document.getElementById('securityGrade');
-        const letter = (data.grade || '?').toString().toUpperCase();
-        const pct = (data.score !== undefined && data.score !== null) ? `${data.score}%` : '0%';
-        securityGrade.className = `security-grade ${this.getGradeClass(data.grade)}`;
-        securityGrade.innerHTML = `
+    const securityGrade = document.getElementById("securityGrade");
+    const letter = (data.grade || "?").toString().toUpperCase();
+    const pct =
+      data.score !== undefined && data.score !== null ? `${data.score}%` : "0%";
+    securityGrade.className = `security-grade ${this.getGradeClass(
+      data.grade
+    )}`;
+    securityGrade.innerHTML = `
             <div class="grade-wrap">
                 <span class="grade-letter">${letter}</span>
                 <span class="grade-percent">${pct}</span>
             </div>
         `;
 
-        this.displayPresentHeaders(data.security_headers || {});
-        this.displayMissingHeaders(data.missing_headers || []);
-        this.displayWarnings(data.warnings || []);
-        this.displayRawData(data);
-        this.showResults();
-        setTimeout(() => {
-            document.getElementById('resultsSection').scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
-        }, 100);
+    this.displayPresentHeaders(data.security_headers || {});
+    this.displayMissingHeaders(data.missing_headers || []);
+    this.displayWarnings(data.warnings || []);
+    this.displayRawData(data);
+    this.showResults();
+    setTimeout(() => {
+      document.getElementById("resultsSection").scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 100);
+  }
+
+  displayPresentHeaders(headers) {
+    const container = document.getElementById("presentHeaders");
+    container.innerHTML = "";
+
+    const presentHeaders = Object.entries(headers).filter(
+      ([_, info]) => info.present
+    );
+
+    if (presentHeaders.length === 0) {
+      container.innerHTML =
+        '<p class="text-muted">No security headers detected</p>';
+      return;
     }
 
-    displayPresentHeaders(headers) {
-        const container = document.getElementById('presentHeaders');
-        container.innerHTML = '';
+    presentHeaders.forEach(([name, info]) => {
+      const headerElement = document.createElement("div");
+      headerElement.className = "mb-3 p-3 border rounded";
 
-        const presentHeaders = Object.entries(headers).filter(([_, info]) => info.present);
+      const statusClass = this.getHeaderStatusClass(info.status);
 
-        if (presentHeaders.length === 0) {
-            container.innerHTML = '<p class="text-muted">No security headers detected</p>';
-            return;
-        }
-
-        presentHeaders.forEach(([name, info]) => {
-            const headerElement = document.createElement('div');
-            headerElement.className = 'mb-3 p-3 border rounded';
-
-            const statusClass = this.getHeaderStatusClass(info.status);
-
-            headerElement.innerHTML = `
+      headerElement.innerHTML = `
                 <div class="d-flex justify-content-between align-items-start mb-2">
                     <h6 class="mb-0">${this.escapeHtml(name)}</h6>
-                    <span class="badge ${statusClass}">${info.status || 'present'}</span>
+                    <span class="badge ${statusClass}">${
+        info.status || "present"
+      }</span>
                 </div>
                 <div class="small text-muted mb-2">
-                    <strong>Value:</strong> <code>${this.escapeHtml(info.value || 'N/A')}</code>
+                    <strong>Value:</strong> <code>${this.escapeHtml(
+                      info.value || "N/A"
+                    )}</code>
                 </div>
-                ${info.recommendation ? `
+                ${
+                  info.recommendation
+                    ? `
                     <div class="small text-info">
                         <i class="fas fa-lightbulb me-1"></i>
                         ${this.escapeHtml(info.recommendation)}
                     </div>
-                ` : ''}
+                `
+                    : ""
+                }
             `;
 
-            container.appendChild(headerElement);
-        });
+      container.appendChild(headerElement);
+    });
+  }
+
+  displayMissingHeaders(missingHeaders) {
+    const container = document.getElementById("missingHeaders");
+    container.innerHTML = "";
+
+    if (missingHeaders.length === 0) {
+      container.innerHTML =
+        '<p class="text-success">All important security headers are present!</p>';
+      return;
     }
 
-    displayMissingHeaders(missingHeaders) {
-        const container = document.getElementById('missingHeaders');
-        container.innerHTML = '';
-
-        if (missingHeaders.length === 0) {
-            container.innerHTML = '<p class="text-success">All important security headers are present!</p>';
-            return;
-        }
-
-        missingHeaders.forEach(header => {
-            const headerElement = document.createElement('div');
-            headerElement.className = 'mb-2 p-2 bg-warning bg-opacity-10 border border-warning rounded';
-            headerElement.innerHTML = `
+    missingHeaders.forEach((header) => {
+      const headerElement = document.createElement("div");
+      headerElement.className =
+        "mb-2 p-2 bg-warning bg-opacity-10 border border-warning rounded";
+      headerElement.innerHTML = `
                 <div class="d-flex align-items-center">
                     <i class="fas fa-exclamation-triangle text-warning me-2"></i>
                     <span>${this.escapeHtml(header)}</span>
                 </div>
             `;
-            container.appendChild(headerElement);
-        });
+      container.appendChild(headerElement);
+    });
+  }
+
+  displayWarnings(warnings) {
+    const warningsSection = document.getElementById("warningsSection");
+    const warningsList = document.getElementById("warningsList");
+
+    if (warnings.length === 0) {
+      warningsSection.style.display = "none";
+      return;
     }
 
-    displayWarnings(warnings) {
-        const warningsSection = document.getElementById('warningsSection');
-        const warningsList = document.getElementById('warningsList');
+    warningsSection.style.display = "block";
+    warningsList.innerHTML = "";
 
-        if (warnings.length === 0) {
-            warningsSection.style.display = 'none';
-            return;
+    const compatList = this.currentRawData?.humble?.browser_compat_map;
+    const normalizeCompat = (s) =>
+      String(s || "")
+        .replace(/^\(\*\)\s*/i, "")
+        .replace(/\(.*?\).*$/, "") // drop trailing parentheses details
+        .replace(/[:\s]+$/g, "")
+        .replace(/\s+/g, " ")
+        .toLowerCase();
+    const compatMap = new Map();
+    if (Array.isArray(compatList)) {
+      for (const item of compatList) {
+        if (item && item.header && item.url) {
+          compatMap.set(normalizeCompat(item.header), String(item.url));
         }
+      }
+    }
 
-        warningsSection.style.display = 'block';
-        warningsList.innerHTML = '';
+    warnings.forEach((warning) => {
+      const headerRaw = String(warning.header || "General");
+      const messageRaw = String(warning.message || "").trim();
 
-        warnings.forEach(warning => {
-            const warningElement = document.createElement('div');
-            warningElement.className = 'alert alert-warning mb-2';
-            warningElement.style.color = 'var(--bs-body-color)';
-            warningElement.innerHTML = `
-                <div class="d-flex align-items-start">
-                    <i class="fas fa-exclamation-triangle text-warning me-2 mt-1"></i>
-                    <div>
-                        <strong>${this.escapeHtml(warning.header || 'General')}:</strong>
-                        ${this.escapeHtml(warning.message)}
+      const normalize = (s) =>
+        s
+          .replace(/^\(\*\)\s*/i, "") // drop leading experimental marker
+          .replace(/[:\s]+$/g, "") // drop trailing colon/space
+          .replace(/\s+/g, " ") // collapse whitespace
+          .toLowerCase();
+
+      const isDuplicate =
+        messageRaw && normalize(headerRaw) === normalize(messageRaw);
+      const showMessage = !!(messageRaw && !isDuplicate);
+
+      const compatUrl = compatMap.get(normalizeCompat(headerRaw));
+      const linkHtml = compatUrl
+        ? `<a class="ms-3 text-decoration-none" href="${this.escapeHtml(
+            compatUrl
+          )}" target="_blank" rel="noopener" aria-label="Open browser compatibility">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="text-primary" style="opacity:.9">
+                            <rect width="24" height="24" fill="none"/>
+                            <path fill="currentColor" fill-rule="evenodd" d="M12.588 5.02a4.525 4.525 0 0 1 6.399 6.399l-.01.01l-2.264 2.264a4.525 4.525 0 0 1-6.824-.489a.75.75 0 1 1 1.201-.898a3.026 3.026 0 0 0 4.562.327l2.26-2.26a3.026 3.026 0 0 0-4.278-4.277L12.34 7.383a.75.75 0 1 1-1.058-1.064zM8.905 9.266a4.525 4.525 0 0 1 5.205 1.53a.75.75 0 0 1-1.201.898a3.024 3.024 0 0 0-4.562-.327l-2.26 2.26a3.025 3.025 0 0 0 4.277 4.278l1.286-1.286a.75.75 0 0 1 1.061 1.06l-1.3 1.3a4.525 4.525 0 0 1-6.399-6.398l.01-.01l2.264-2.264a4.5 4.5 0 0 1 1.62-1.04" clip-rule="evenodd"/>
+                        </svg>
+                    </a>`
+        : "";
+
+      const warningElement = document.createElement("div");
+      warningElement.className = "alert alert-warning mb-2";
+      warningElement.style.color = "var(--bs-body-color)";
+      warningElement.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="d-flex align-items-start flex-grow-1">
+                        <i class="fas fa-exclamation-triangle text-warning me-2 mt-1"></i>
+                        <div>
+                            <strong>${this.escapeHtml(headerRaw)}</strong>
+                            ${
+                              showMessage
+                                ? `: ${this.escapeHtml(messageRaw)}`
+                                : ""
+                            }
+                        </div>
                     </div>
+                    ${linkHtml}
                 </div>
             `;
-            warningsList.appendChild(warningElement);
-        });
+      warningsList.appendChild(warningElement);
+    });
+  }
+
+  displayRawData(data) {
+    const rawDataElement = document.getElementById("rawData");
+    rawDataElement.textContent = JSON.stringify(data, null, 2);
+    this.currentRawData = data;
+  }
+
+  getGradeClass(grade) {
+    switch (grade?.toUpperCase()) {
+      case "A":
+        return "grade-a";
+      case "B":
+        return "grade-b";
+      case "C":
+        return "grade-c";
+      case "D":
+        return "grade-d";
+      case "F":
+        return "grade-f";
+      default:
+        return "grade-unknown";
     }
+  }
 
-    displayRawData(data) {
-        const rawDataElement = document.getElementById('rawData');
-        rawDataElement.textContent = JSON.stringify(data, null, 2);
-        this.currentRawData = data;
+  getHeaderStatusClass(status) {
+    switch (status?.toLowerCase()) {
+      case "good":
+      case "present":
+        return "bg-success";
+      case "warning":
+        return "bg-warning text-dark";
+      case "error":
+      case "bad":
+        return "bg-danger";
+      default:
+        return "bg-secondary";
     }
+  }
 
-    getGradeClass(grade) {
-        switch (grade?.toUpperCase()) {
-            case 'A': return 'grade-a';
-            case 'B': return 'grade-b';
-            case 'C': return 'grade-c';
-            case 'D': return 'grade-d';
-            case 'F': return 'grade-f';
-            default: return 'grade-unknown';
-        }
+  showLoading(show) {
+    this.isLoading = show;
+    this.loadingIndicator.style.display = show ? "block" : "none";
+    this.analyzeBtn.disabled = show;
+    this.analyzeBtn.setAttribute("aria-busy", show ? "true" : "false");
+    this.urlInput.disabled = show;
+    this.forceRefresh.disabled = show;
+
+    if (show) {
+      this.analyzeBtn.innerHTML =
+        '<i class="fas fa-spinner fa-spin me-2"></i>Analyzing...';
+    } else {
+      this.analyzeBtn.innerHTML = '<i class="fas fa-search me-2"></i>Analyze';
     }
+  }
 
-    getHeaderStatusClass(status) {
-        switch (status?.toLowerCase()) {
-            case 'good':
-            case 'present':
-                return 'bg-success';
-            case 'warning':
-                return 'bg-warning text-dark';
-            case 'error':
-            case 'bad':
-                return 'bg-danger';
-            default:
-                return 'bg-secondary';
-        }
+  showResults() {
+    this.resultsSection.style.display = "block";
+    const anchor = document.getElementById("results");
+    if (anchor) {
+      anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      this.resultsSection.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     }
+  }
 
-    showLoading(show) {
-        this.isLoading = show;
-        this.loadingIndicator.style.display = show ? 'block' : 'none';
-        this.analyzeBtn.disabled = show;
-        this.analyzeBtn.setAttribute('aria-busy', show ? 'true' : 'false');
-        this.urlInput.disabled = show;
-        this.forceRefresh.disabled = show;
+  hideResults() {
+    this.resultsSection.style.display = "none";
+  }
 
-        if (show) {
-            this.analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Analyzing...';
-        } else {
-            this.analyzeBtn.innerHTML = '<i class="fas fa-search me-2"></i>Analyze';
-        }
+  showError(message) {
+    const errorMessage = document.getElementById("errorMessage");
+    errorMessage.textContent = message;
+    this.errorAlert.style.display = "block";
+    this.errorAlert.scrollIntoView({ behavior: "smooth" });
+  }
+
+  hideError() {
+    this.errorAlert.style.display = "none";
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  checkForSharedUrl() {
+    if (this.urlInput.value.trim()) {
+      this.analyzeUrl();
     }
+  }
 
-    showResults() {
-        this.resultsSection.style.display = 'block';
-        const anchor = document.getElementById('results');
-        if (anchor) {
-            anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else {
-            this.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    }
+  updateShareLink(url) {
+    this.currentAnalyzedUrl = url;
+    this.shareBtn.style.display = "inline-block";
+    // this.copyShareLinkToClipboard();
+  }
 
-    hideResults() {
-        this.resultsSection.style.display = 'none';
-    }
+  copyShareLinkToClipboard() {
+    if (!this.currentAnalyzedUrl) return;
 
-    showError(message) {
-        const errorMessage = document.getElementById('errorMessage');
-        errorMessage.textContent = message;
-        this.errorAlert.style.display = 'block';
-        this.errorAlert.scrollIntoView({ behavior: 'smooth' });
-    }
+    const shareUrl = `${window.location.origin}/?url=${encodeURIComponent(
+      this.currentAnalyzedUrl
+    )}`;
 
-    hideError() {
-        this.errorAlert.style.display = 'none';
-    }
+    navigator.clipboard
+      .writeText(shareUrl)
+      .then(() => {
+        const originalText = this.shareBtn.innerHTML;
+        this.shareBtn.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+        this.shareBtn.classList.remove("btn-outline-primary");
+        this.shareBtn.classList.add("btn-success");
 
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    checkForSharedUrl() {
-        if (this.urlInput.value.trim()) {
-            this.analyzeUrl();
-        }
-    }
-
-    updateShareLink(url) {
-        this.currentAnalyzedUrl = url;
-        this.shareBtn.style.display = 'inline-block';
-        // this.copyShareLinkToClipboard();
-    }
-
-    copyShareLinkToClipboard() {
-        if (!this.currentAnalyzedUrl) return;
-
-        const shareUrl = `${window.location.origin}/?url=${encodeURIComponent(this.currentAnalyzedUrl)}`;
-
-        navigator.clipboard.writeText(shareUrl).then(() => {
-            const originalText = this.shareBtn.innerHTML;
-            this.shareBtn.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
-            this.shareBtn.classList.remove('btn-outline-primary');
-            this.shareBtn.classList.add('btn-success');
-
-            setTimeout(() => {
-                this.shareBtn.innerHTML = originalText;
-                this.shareBtn.classList.remove('btn-success');
-                this.shareBtn.classList.add('btn-outline-primary');
-            }, 2000);
-        }).catch(() => {
-            const shareUrl = `${window.location.origin}/?url=${encodeURIComponent(this.currentAnalyzedUrl)}`;
-            prompt('Copy this share link:', shareUrl);
-        });
-    }
+        setTimeout(() => {
+          this.shareBtn.innerHTML = originalText;
+          this.shareBtn.classList.remove("btn-success");
+          this.shareBtn.classList.add("btn-outline-primary");
+        }, 2000);
+      })
+      .catch(() => {
+        const shareUrl = `${window.location.origin}/?url=${encodeURIComponent(
+          this.currentAnalyzedUrl
+        )}`;
+        prompt("Copy this share link:", shareUrl);
+      });
+  }
 }
 
 async function checkHealth() {
-    try {
-        const response = await fetch('/api/health');
-        const data = await response.json();
+  try {
+    const response = await fetch("/api/health");
+    const data = await response.json();
 
-        const statusClass = data.status === 'healthy' ? 'success' : 'danger';
-        const message = data.status === 'healthy'
-            ? `System is healthy. Humble: ${data.services.humble}`
-            : `System is unhealthy: ${data.error}`;
+    const statusClass = data.status === "healthy" ? "success" : "danger";
+    const message =
+      data.status === "healthy"
+        ? `System is healthy. Humble: ${data.services.humble}`
+        : `System is unhealthy: ${data.error}`;
 
-        showToast(message, statusClass);
-    } catch (error) {
-        showToast('Failed to check health: ' + error.message, 'danger');
-    }
+    showToast(message, statusClass);
+  } catch (error) {
+    showToast("Failed to check health: " + error.message, "danger");
+  }
 }
 
 async function clearCache() {
-    try {
-        const response = await fetch('/api/cache/clear', { method: 'POST' });
-        const data = await response.json();
+  try {
+    const response = await fetch("/api/cache/clear", { method: "POST" });
+    const data = await response.json();
 
-        if (response.ok) {
-            showToast('Cache cleared successfully', 'success');
-        } else {
-            showToast('Failed to clear cache: ' + data.message, 'danger');
-        }
-    } catch (error) {
-        showToast('Failed to clear cache: ' + error.message, 'danger');
+    if (response.ok) {
+      showToast("Cache cleared successfully", "success");
+    } else {
+      showToast("Failed to clear cache: " + data.message, "danger");
     }
+  } catch (error) {
+    showToast("Failed to clear cache: " + error.message, "danger");
+  }
 }
 
 function copyToClipboard(elementId) {
-    const element = document.getElementById(elementId);
-    const text = element.textContent;
+  const element = document.getElementById(elementId);
+  const text = element.textContent;
 
-    navigator.clipboard.writeText(text).then(() => {
-        showToast('Copied to clipboard', 'success');
-    }).catch(err => {
-        showToast('Failed to copy: ' + err.message, 'danger');
+  navigator.clipboard
+    .writeText(text)
+    .then(() => {
+      showToast("Copied to clipboard", "success");
+    })
+    .catch((err) => {
+      showToast("Failed to copy: " + err.message, "danger");
     });
 }
 
 function downloadJson() {
-    if (!window.analyzer || !window.analyzer.currentRawData) {
-        showToast('No data available for download', 'warning');
-        return;
-    }
+  if (!window.analyzer || !window.analyzer.currentRawData) {
+    showToast("No data available for download", "warning");
+    return;
+  }
 
-    const data = window.analyzer.currentRawData;
-    const jsonString = JSON.stringify(data, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+  const data = window.analyzer.currentRawData;
+  const jsonString = JSON.stringify(data, null, 2);
+  const blob = new Blob([jsonString], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `security-analysis-${data.url ? data.url.replace(/[^a-zA-Z0-9]/g, '-') : 'unknown'}-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `security-analysis-${
+    data.url ? data.url.replace(/[^a-zA-Z0-9]/g, "-") : "unknown"
+  }-${new Date().toISOString().split("T")[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 
-    showToast('JSON file downloaded', 'success');
+  showToast("JSON file downloaded", "success");
 }
 
 let __toastQueue = [];
 let __toastShowing = false;
 
-function showToast(message, type = 'info') {
-    __toastQueue.push({ message, type });
-    if (!__toastShowing) {
-        __processNextToast();
-    }
+function showToast(message, type = "info") {
+  __toastQueue.push({ message, type });
+  if (!__toastShowing) {
+    __processNextToast();
+  }
 }
 
 function __processNextToast() {
-    if (__toastQueue.length === 0) {
-        __toastShowing = false;
-        return;
-    }
+  if (__toastQueue.length === 0) {
+    __toastShowing = false;
+    return;
+  }
 
-    __toastShowing = true;
-    const { message, type } = __toastQueue.shift();
+  __toastShowing = true;
+  const { message, type } = __toastQueue.shift();
 
-    const toast = document.createElement('div');
-    toast.className = `toast-notification toast-${type}`;
-    toast.style.cssText = 'position: fixed; top: 20px; right: -350px; z-index: 9999; min-width: 320px; max-width: 400px; transition: right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);';
-    toast.innerHTML = `
+  const toast = document.createElement("div");
+  toast.className = `toast-notification toast-${type}`;
+  toast.style.cssText =
+    "position: fixed; top: 20px; right: -350px; z-index: 9999; min-width: 320px; max-width: 400px; transition: right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);";
+  toast.innerHTML = `
         <div class="toast-content">
             <i class="fas ${getToastIcon(type)} me-2"></i>
             <span>${message}</span>
@@ -470,46 +572,54 @@ function __processNextToast() {
         </div>
     `;
 
-    document.body.appendChild(toast);
-    toast.offsetHeight;
-    setTimeout(() => { toast.style.right = '20px'; }, 50);
+  document.body.appendChild(toast);
+  toast.offsetHeight;
+  setTimeout(() => {
+    toast.style.right = "20px";
+  }, 50);
 
-    toast.__autoTimer = setTimeout(() => { hideToast(toast); }, 4000);
+  toast.__autoTimer = setTimeout(() => {
+    hideToast(toast);
+  }, 4000);
 }
 
 function hideToast(toast) {
-    if (!toast || !toast.parentNode) return;
-    if (toast.__autoTimer) {
-        clearTimeout(toast.__autoTimer);
-        toast.__autoTimer = null;
+  if (!toast || !toast.parentNode) return;
+  if (toast.__autoTimer) {
+    clearTimeout(toast.__autoTimer);
+    toast.__autoTimer = null;
+  }
+
+  toast.style.right = "-350px";
+
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.parentNode.removeChild(toast);
     }
-
-    toast.style.right = '-350px';
-
-    setTimeout(() => {
-        if (toast.parentNode) {
-            toast.parentNode.removeChild(toast);
-        }
-        __toastShowing = false;
-        __processNextToast();
-    }, 400);
+    __toastShowing = false;
+    __processNextToast();
+  }, 400);
 }
 
 function getToastIcon(type) {
-    switch (type) {
-        case 'success': return 'fa-check-circle';
-        case 'danger': return 'fa-exclamation-circle';
-        case 'warning': return 'fa-exclamation-triangle';
-        default: return 'fa-info-circle';
-    }
+  switch (type) {
+    case "success":
+      return "fa-check-circle";
+    case "danger":
+      return "fa-exclamation-circle";
+    case "warning":
+      return "fa-exclamation-triangle";
+    default:
+      return "fa-info-circle";
+  }
 }
 
 function copyShareLink() {
-    if (window.analyzer) {
-        window.analyzer.copyShareLinkToClipboard();
-    }
+  if (window.analyzer) {
+    window.analyzer.copyShareLinkToClipboard();
+  }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    window.analyzer = new SecurityHeaderAnalyzer();
+document.addEventListener("DOMContentLoaded", () => {
+  window.analyzer = new SecurityHeaderAnalyzer();
 });

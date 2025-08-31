@@ -25,7 +25,7 @@ The system is designed as a simple, lightweight service that performs live HTTP 
   - `HumbleService`: Handles HTTP security header analysis with automatic protocol fallback (HTTPS→HTTP)
   - `CacheService`: Provides in-memory caching with TTL support for performance optimization
   - `URLValidator`: Handles URL validation, normalization, and protocol detection
-- **Rate Limiting**: Flask-Limiter integration for API protection (200/day, 50/hour globally, 10/minute per endpoint)
+- **Rate Limiting**: Flask-Limiter integration for API protection
 - **Security**: ProxyFix middleware for proper header handling behind proxies
 
 ### Data Flow
@@ -33,10 +33,10 @@ The system is designed as a simple, lightweight service that performs live HTTP 
 1. User submits URL through web interface or API (or loads shared URL)
 2. URL validation and normalization with automatic protocol detection (HTTPS preferred)
 3. Cache check for existing results
-4. Security header analysis via custom Python engine if cache miss (with HTTP fallback if HTTPS fails)
-5. Result parsing and formatting
-6. Response delivery with caching
-7. Automatic generation and copying of shareable URL for results
+4. Analysis executed by humble CLI (brief JSON) with optional HTTPS→HTTP fallback
+5. Result mapping to UI/API schema and caching
+6. Response delivery
+7. Optional shareable URL for results
 
 ### Error Handling
 
@@ -56,9 +56,23 @@ The system is designed as a simple, lightweight service that performs live HTTP 
 
 ### Security Analysis Engine
 
-- **Custom HTTP Security Header Analyzer**: Built-in Python-based analysis engine that replaces the original humble CLI dependency
-- Analyzes 8 key security headers with intelligent scoring and recommendations
-- No external CLI dependencies required - uses Python requests library for HTTP analysis
+- **humble CLI (only)**: The application relies exclusively on the official humble analyzer for checks, grading, and summaries.
+
+Configuration for humble:
+
+- Set one of the following environment variables so the app can locate humble:
+  - `HUMBLE_PY`: Full path to `humble.py` (e.g., `D:/tools/humble/humble.py`)
+  - `HUMBLE_HOME`: Directory containing `humble.py` (e.g., `D:/tools/humble`)
+- Optional: `PYTHON_LAUNCHER` to override the Python executable used to run humble (defaults to `py` on Windows, `python3` on Linux/macOS)
+
+Installation of humble (from source) summary:
+
+```bash
+git clone https://github.com/rfc-st/humble.git
+cd humble
+pip install -r requirements.txt
+# then set HUMBLE_HOME to this directory or HUMBLE_PY to its humble.py
+```
 
 ### Runtime Dependencies
 
@@ -101,6 +115,36 @@ The Flask app serves both the API and the web UI (from `templates/` and `static/
   ```
 
 Then open http://localhost:5000 in your browser.
+
+### Zero-friction setup with uv
+
+```bash
+uv sync --frozen --no-dev
+# Option A: vendor humble once (recommended)
+git clone https://github.com/rfc-st/humble.git .tools/humble
+# Windows PowerShell
+$env:HUMBLE_HOME = "$PWD/.tools/humble"
+# macOS/Linux
+export HUMBLE_HOME="$PWD/.tools/humble"
+
+uv run python main.py
+```
+
+Notes:
+- The app auto-discovers `.tools/humble/humble.py` or `vendor/humble/humble.py` if `HUMBLE_HOME`/`HUMBLE_PY` is not set.
+- If you prefer an isolated interpreter for humble, create a venv under `.tools/humble/.venv` and set `PYTHON_LAUNCHER` to that interpreter path. Otherwise the app uses the current `sys.executable`.
+
+API response shape (humble-only, abbreviated):
+- url, status_code, timestamp, scan_time, cached
+- headers: raw response headers
+- grade (A–F), score, analysis_source="humble"
+- security_headers: object keyed by header name with present/value/status
+- missing_headers: array of header names
+- warnings: array of {header, message}
+- humble: passthrough of parsed humble output with:
+  - present_headers, missing_headers, deprecated_or_insecure, fingerprint_headers, empty_values
+  - info, browser_compat, browser_compat_map, analysis_results_lines, analysis_runtime_seconds
+  - totals (numeric counts), grade, raw_object, source
 
 ## Production Deployment
 
