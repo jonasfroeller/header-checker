@@ -14,11 +14,11 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 256 * 1024  # 256KB limit for request bodies
+app.config["MAX_CONTENT_LENGTH"] = 256 * 1024  # 256KB limit for request bodies
 
-_env = (os.environ.get('FLASK_ENV') or '').lower()
-_app_env = (os.environ.get('APP_ENV') or '').lower()
-_is_production = 'production' in {_env, _app_env}
+_env = (os.environ.get("FLASK_ENV") or "").lower()
+_app_env = (os.environ.get("APP_ENV") or "").lower()
+_is_production = "production" in {_env, _app_env}
 _session_secret = os.environ.get("SESSION_SECRET")
 if not _session_secret:
     _session_secret = secrets.token_urlsafe(32)
@@ -29,29 +29,34 @@ if not _session_secret:
         )
 app.secret_key = _session_secret
 
-_trust_proxy = os.environ.get('TRUST_PROXY', '0') in {'1', 'true', 'yes', 'on'}
+_trust_proxy = os.environ.get("TRUST_PROXY", "0") in {"1", "true", "yes", "on"}
 if _trust_proxy:
     try:
         from werkzeug.middleware.proxy_fix import ProxyFix
+
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     except Exception as _e:
         logger.warning(f"ProxyFix unavailable or failed: {_e}")
 
 # Configure CORS origins via env (comma-separated). Defaults to '*' for compatibility.
-_cors_origins_env = os.environ.get('CORS_ORIGINS')
-_cors_origins = [o.strip() for o in _cors_origins_env.split(',')] if _cors_origins_env else "*"
-
-CORS(app, resources={r"/api/*": {
-    "origins": _cors_origins,
-    "methods": ["GET", "POST"],
-    "allow_headers": ["Content-Type"],
-    "supports_credentials": False
-}})
-
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["1 per second"]
+_cors_origins_env = os.environ.get("CORS_ORIGINS")
+_cors_origins = (
+    [o.strip() for o in _cors_origins_env.split(",")] if _cors_origins_env else "*"
 )
+
+CORS(
+    app,
+    resources={
+        r"/api/*": {
+            "origins": _cors_origins,
+            "methods": ["GET", "POST"],
+            "allow_headers": ["Content-Type"],
+            "supports_credentials": False,
+        }
+    },
+)
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["1 per second"])
 limiter.init_app(app)
 
 humble_service = HumbleService()
@@ -62,66 +67,82 @@ url_validator = URLValidator()
 @app.after_request
 def add_security_headers(resp):
     """Add basic security headers for API responses."""
-    resp.headers.setdefault('X-Content-Type-Options', 'nosniff')
-    resp.headers.setdefault('Referrer-Policy', 'no-referrer')
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("Referrer-Policy", "no-referrer")
 
     try:
-        path = request.path or ''
+        path = request.path or ""
     except Exception:
-        path = ''
+        path = ""
 
-    if path.startswith('/api/'):
+    if path.startswith("/api/"):
         # Prevent clickjacking of API responses
-        resp.headers.setdefault('X-Frame-Options', 'DENY')
+        resp.headers.setdefault("X-Frame-Options", "DENY")
 
         # Strict cache policy for sensitive API responses
         resp.headers.setdefault(
-            'Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-        resp.headers.setdefault('Pragma', 'no-cache')
-        resp.headers.setdefault('Expires', '0')
+            "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0"
+        )
+        resp.headers.setdefault("Pragma", "no-cache")
+        resp.headers.setdefault("Expires", "0")
 
         # Lock down powerful browser features
         resp.headers.setdefault(
-            'Permissions-Policy', 'accelerometer=(), camera=(), microphone=(), geolocation=(), gyroscope=(), magnetometer=(), payment=(), usb=(), browsing-topics=()')
+            "Permissions-Policy",
+            "accelerometer=(), camera=(), microphone=(), geolocation=(), gyroscope=(), magnetometer=(), payment=(), usb=(), browsing-topics=()",
+        )
 
         # Minimal CSP for API responses
         resp.headers.setdefault(
-            'Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+            "Content-Security-Policy",
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+        )
 
         # Cross-origin resource policy: allow cross-origin fetches
-        resp.headers.setdefault('Cross-Origin-Resource-Policy', 'cross-origin')
+        resp.headers.setdefault("Cross-Origin-Resource-Policy", "cross-origin")
 
         # Cross-origin opener policy to isolate browsing context
-        resp.headers.setdefault('Cross-Origin-Opener-Policy', 'same-origin')
+        resp.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
 
         # Disallow Adobe Flash/PDF cross-domain data access
-        resp.headers.setdefault('X-Permitted-Cross-Domain-Policies', 'none')
+        resp.headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
 
         # HSTS in production when served over HTTPS (incl. proxied envs)
         if _is_production:
             try:
-                _xfp = (request.headers.get('X-Forwarded-Proto') or '').split(',')[0].strip().lower()
+                _xfp = (
+                    (request.headers.get("X-Forwarded-Proto") or "")
+                    .split(",")[0]
+                    .strip()
+                    .lower()
+                )
             except Exception:
-                _xfp = ''
-            _is_https = request.is_secure or _xfp == 'https'
+                _xfp = ""
+            _is_https = request.is_secure or _xfp == "https"
             if _is_https:
-                resp.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
+                resp.headers.setdefault(
+                    "Strict-Transport-Security",
+                    "max-age=31536000; includeSubDomains; preload",
+                )
 
         # XSS protection header for legacy scanners/browsers
-        resp.headers.setdefault('X-XSS-Protection', '1; mode=block')
+        resp.headers.setdefault("X-XSS-Protection", "1; mode=block")
     return resp
 
 
-@app.route('/')
+@app.route("/")
 def index():
     """Render the main web interface"""
-    is_dev_mode = app.debug or os.environ.get(
-        'FLASK_ENV') == 'development' or os.environ.get('REPL_SLUG')
-    shared_url = request.args.get('url')
-    return render_template('index.html', is_dev_mode=is_dev_mode, shared_url=shared_url)
+    is_dev_mode = (
+        app.debug
+        or os.environ.get("FLASK_ENV") == "development"
+        or os.environ.get("REPL_SLUG")
+    )
+    shared_url = request.args.get("url")
+    return render_template("index.html", is_dev_mode=is_dev_mode, shared_url=shared_url)
 
 
-@app.route('/api/analyze', methods=['POST'])
+@app.route("/api/analyze", methods=["POST"])
 @limiter.limit("60 per second", override_defaults=True)
 def analyze_url():
     """
@@ -133,167 +154,225 @@ def analyze_url():
         "force_refresh": false
     }
     """
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                'error': 'Invalid JSON payload',
-                'message': 'Request must contain valid JSON data'
-            }), 400
+    data = request.get_json(silent=True)
+    if data is None:
+        return (
+            jsonify(
+                {
+                    "error": "Invalid or missing JSON payload",
+                    "message": "Request must be a valid JSON object with Content-Type: application/json",
+                    "schema": {
+                        "url": "<string, required>",
+                        "force_refresh": "<boolean, optional>",
+                    },
+                }
+            ),
+            400,
+        )
 
-        url = data.get('url')
+    try:
+        url = data.get("url")
         if not url:
-            return jsonify({
-                'error': 'Missing URL',
-                'message': 'URL field is required'
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "error": "Missing URL parameter",
+                        "message": 'The "url" field is required in the JSON payload',
+                    }
+                ),
+                400,
+            )
 
         validation_result = url_validator.validate(url)
-        if not validation_result['valid']:
-            return jsonify({
-                'error': 'Invalid URL',
-                'message': validation_result['message']
-            }), 400
+        if not validation_result["valid"]:
+            return (
+                jsonify(
+                    {"error": "Invalid URL", "message": validation_result["message"]}
+                ),
+                400,
+            )
 
-        normalized_url = validation_result['normalized_url']
-        try_fallback = validation_result.get('try_fallback', False)
-        force_refresh = data.get('force_refresh', False)
-        minimal_response = request.args.get('minimal', 'false').lower() == 'true'
+        normalized_url = validation_result["normalized_url"]
+        try_fallback = validation_result.get("try_fallback", False)
+        force_refresh = data.get("force_refresh", False)
+        minimal_response = request.args.get("minimal", "false").lower() == "true"
 
         if not force_refresh:
             cached_result = cache_service.get(normalized_url)
             if cached_result:
                 logger.info(f"Cache hit for URL: {normalized_url}")
-                
+
                 if minimal_response:
-                    response_data = transform_to_minimal(cached_result, normalized_url, cached=True)
+                    response_data = transform_to_minimal(
+                        cached_result, normalized_url, cached=True
+                    )
                 else:
                     response_data = {
-                        'url': normalized_url,
-                        'cached': True,
-                        **cached_result
+                        "url": normalized_url,
+                        "cached": True,
+                        **cached_result,
                     }
                 return jsonify(response_data)
 
         # Analyze with humble (with automatic protocol fallback)
         logger.info(f"Analyzing URL with humble: {normalized_url}")
         analysis_result = humble_service.analyze(
-            normalized_url, try_fallback=try_fallback)
+            normalized_url, try_fallback=try_fallback
+        )
 
         if not analysis_result or not isinstance(analysis_result, dict):
             logger.error("Humble analyze returned no result or invalid result")
-            return jsonify({
-                'error': 'Analysis failed',
-                'message': 'Humble analysis did not return a valid result'
-            }), 500
+            return (
+                jsonify(
+                    {
+                        "error": "Analysis failed",
+                        "message": "Humble analysis did not return a valid result",
+                    }
+                ),
+                500,
+            )
 
-        if analysis_result.get('success'):
-            cache_service.set(normalized_url, analysis_result['data'])
+        if analysis_result.get("success"):
+            cache_service.set(normalized_url, analysis_result["data"])
 
             if minimal_response:
-                response_data = transform_to_minimal(analysis_result['data'], normalized_url, cached=False)
+                response_data = transform_to_minimal(
+                    analysis_result["data"], normalized_url, cached=False
+                )
             else:
                 response_data = {
-                    'url': normalized_url,
-                    'cached': False,
-                    **analysis_result['data']
+                    "url": normalized_url,
+                    "cached": False,
+                    **analysis_result["data"],
                 }
             return jsonify(response_data)
         else:
-            return jsonify({
-                'error': 'Analysis failed',
-                'message': analysis_result.get('error') or 'Unknown error'
-            }), 500
+            return (
+                jsonify(
+                    {
+                        "error": "Analysis failed",
+                        "message": analysis_result.get("error") or "Unknown error",
+                    }
+                ),
+                500,
+            )
 
     except Exception as e:
         logger.error(f"Unexpected error in analyze_url: {str(e)}")
-        return jsonify({
-            'error': 'Internal server error',
-            'message': 'An unexpected error occurred'
-        }), 500
+        return (
+            jsonify(
+                {
+                    "error": "Internal server error",
+                    "message": "An unexpected error occurred",
+                }
+            ),
+            500,
+        )
 
 
-@app.route('/api/health', methods=['GET'])
+@app.route("/api/health", methods=["GET"])
 def health_check():
     """Health check endpoint"""
     try:
         humble_available = humble_service.check_availability()
 
-        return jsonify({
-            'status': 'healthy',
-            'services': {
-                'humble': 'available' if humble_available else 'unavailable',
-                'cache': 'available'
-            },
-            'cache_stats': cache_service.get_stats()
-        })
+        return jsonify(
+            {
+                "status": "healthy",
+                "services": {
+                    "humble": "available" if humble_available else "unavailable",
+                    "cache": "available",
+                },
+                "cache_stats": cache_service.get_stats(),
+            }
+        )
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e)
-        }), 500
+        return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
 
-@app.route('/api/cache/clear', methods=['POST'])
+@app.route("/api/cache/clear", methods=["POST"])
 @limiter.limit("5 per minute")
 def clear_cache():
     """Clear the analysis cache"""
     try:
-        is_dev_mode = app.debug or os.environ.get(
-            'FLASK_ENV') == 'development' or os.environ.get('REPL_SLUG')
+        is_dev_mode = (
+            app.debug
+            or os.environ.get("FLASK_ENV") == "development"
+            or os.environ.get("REPL_SLUG")
+        )
         if not is_dev_mode:
-            return jsonify({
-                'error': 'Forbidden',
-                'message': 'Cache clearing is disabled in production'
-            }), 403
+            return (
+                jsonify(
+                    {
+                        "error": "Forbidden",
+                        "message": "Cache clearing is disabled in production",
+                    }
+                ),
+                403,
+            )
         cache_service.clear()
-        return jsonify({
-            'message': 'Cache cleared successfully'
-        })
+        return jsonify({"message": "Cache cleared successfully"})
     except Exception as e:
         logger.error(f"Failed to clear cache: {str(e)}")
-        return jsonify({
-            'error': 'Failed to clear cache',
-            'message': str(e)
-        }), 500
+        return jsonify({"error": "Failed to clear cache", "message": str(e)}), 500
 
 
 @app.errorhandler(429)
 def ratelimit_handler(e):
     """Handle rate limit exceeded"""
-    return jsonify({
-        'error': 'Rate limit exceeded',
-        'message': 'Too many requests. Please try again later.'
-    }), 429
+    return (
+        jsonify(
+            {
+                "error": "Rate limit exceeded",
+                "message": "Too many requests. Please try again later.",
+            }
+        ),
+        429,
+    )
 
 
 @app.errorhandler(404)
 def not_found_handler(e):
     """Handle 404 errors"""
-    return jsonify({
-        'error': 'Not found',
-        'message': 'The requested endpoint does not exist'
-    }), 404
+    return (
+        jsonify(
+            {"error": "Not found", "message": "The requested endpoint does not exist"}
+        ),
+        404,
+    )
 
 
 @app.errorhandler(413)
 def request_entity_too_large(e):
     """Return JSON for payloads exceeding MAX_CONTENT_LENGTH"""
-    return jsonify({
-        'error': 'Request entity too large',
-        'message': 'The request payload exceeds the allowed size.'
-    }), 413
+    return (
+        jsonify(
+            {
+                "error": "Request entity too large",
+                "message": "The request payload exceeds the allowed size.",
+            }
+        ),
+        413,
+    )
 
 
 @app.errorhandler(Exception)
 def handle_exception(e):
     """Return JSON instead of HTML for generic errors"""
-    status = getattr(e, 'code', 500)
-    name = getattr(e, 'name', 'HTTP error' if status and status !=
-                   500 else 'Internal server error')
-    description = getattr(e, 'description', 'An HTTP error occurred' if status and status !=
-                          500 else 'An unexpected error occurred')
+    status = getattr(e, "code", 500)
+    name = getattr(
+        e, "name", "HTTP error" if status and status != 500 else "Internal server error"
+    )
+    description = getattr(
+        e,
+        "description",
+        (
+            "An HTTP error occurred"
+            if status and status != 500
+            else "An unexpected error occurred"
+        ),
+    )
 
     if status >= 500:
         try:
@@ -301,23 +380,26 @@ def handle_exception(e):
         except Exception:
             pass
 
-    return jsonify({
-        'error': name,
-        'message': description
-    }), status
+    return jsonify({"error": name, "message": description}), status
 
 
 @app.errorhandler(500)
 def internal_error_handler(e):
     """Handle 500 errors"""
     logger.error(f"Internal server error: {str(e)}")
-    return jsonify({
-        'error': 'Internal server error',
-        'message': 'An unexpected error occurred'
-    }), 500
+    return (
+        jsonify(
+            {
+                "error": "Internal server error",
+                "message": "An unexpected error occurred",
+            }
+        ),
+        500,
+    )
 
 
-if __name__ == '__main__':
-    debug_flag = (os.environ.get('FLASK_ENV') == 'development') or bool(
-        os.environ.get('REPL_SLUG'))
-    app.run(host='0.0.0.0', port=5000, debug=debug_flag)
+if __name__ == "__main__":
+    debug_flag = (os.environ.get("FLASK_ENV") == "development") or bool(
+        os.environ.get("REPL_SLUG")
+    )
+    app.run(host="0.0.0.0", port=5000, debug=debug_flag)
