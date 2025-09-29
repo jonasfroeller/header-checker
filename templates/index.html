@@ -363,10 +363,10 @@
         </div>
 
         <!-- API Documentation -->
-        <div id="api-docs" class="mt-5">
+        <div class="mt-5">
           <div class="row justify-content-center">
             <div class="col-12 col-lg-10 col-xl-8">
-              <div class="card shadow">
+              <div id="api-docs" class="card shadow">
                 <div class="card-header py-3">
                   <h5 class="mb-0 d-flex align-items-center">
                     <i class="fas fa-book me-2"></i>
@@ -389,15 +389,24 @@
                     <h6 class="mb-2">
                       <i class="fas fa-search me-2"></i>Analyze a URL
                     </h6>
+                    <p class="small text-muted mb-1">Default (full) response:</p>
                     <pre
                       class="mb-2"
                     ><code id="curlAnalyze" class="language-bash">curl -sS -X POST https://example.com/api/analyze \
   -H "Content-Type: application/json" \
   -d '{"url":"https://example.com","force_refresh":false}'</code></pre>
+                    
+                    <p class="small text-muted mb-1 mt-3">Minimal (de-duplicated) response:</p>
+                    <pre
+                      class="mb-2"
+                    ><code id="curlAnalyzeMinimal" class="language-bash">curl -sS -X POST "https://example.com/api/analyze?minimal=true" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com"}'</code></pre>
+
                     <small class="text-muted"
-                      >Set <code>force_refresh</code> to <code>true</code> to
-                      bypass cache.</small
-                    >
+                      >Set <code>force_refresh: true</code> in the JSON body to
+                      bypass cache. Use the <code>?minimal=true</code> query parameter for a de-duplicated response.
+                    </small>
                   </div>
                   <hr />
                   <div class="mb-3">
@@ -457,11 +466,14 @@
               const apiBaseEl = document.getElementById("apiBaseUrl");
               const healthEl = document.getElementById("curlHealth");
               const analyzeEl = document.getElementById("curlAnalyze");
+              const analyzeMinimalEl = document.getElementById("curlAnalyzeMinimal");
               if (apiBaseEl) apiBaseEl.textContent = base;
               if (healthEl)
                 healthEl.textContent = `curl -sS ${base}/api/health`;
               if (analyzeEl)
                 analyzeEl.textContent = `curl -sS -X POST ${base}/api/analyze \\\n   -H "Content-Type: application/json" \\\n   -d '{"url":"https://example.com","force_refresh":false}'`;
+              if (analyzeMinimalEl)
+                analyzeMinimalEl.textContent = `curl -sS -X POST "${base}/api/analyze?minimal=true" \\\n   -H "Content-Type: application/json" \\\n   -d '{"url":"https://example.com"}'`;
             } catch (e) {}
           })();
         </script>

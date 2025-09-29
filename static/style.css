@@ -267,6 +267,10 @@ html {
     scroll-margin-top: 120px;
 }
 
+#api-docs {
+    scroll-margin-top: 100px;
+}
+
 /* Precise anchor for first results card */
 #results {
     scroll-margin-top: 120px;

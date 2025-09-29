@@ -8,6 +8,7 @@ import secrets
 from services.humble_service import HumbleService
 from services.cache_service import CacheService
 from utils.validators import URLValidator
+from utils.response_transformer import transform_to_minimal
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -157,16 +158,22 @@ def analyze_url():
         normalized_url = validation_result['normalized_url']
         try_fallback = validation_result.get('try_fallback', False)
         force_refresh = data.get('force_refresh', False)
+        minimal_response = request.args.get('minimal', 'false').lower() == 'true'
 
         if not force_refresh:
             cached_result = cache_service.get(normalized_url)
             if cached_result:
                 logger.info(f"Cache hit for URL: {normalized_url}")
-                return jsonify({
-                    'url': normalized_url,
-                    'cached': True,
-                    **cached_result
-                })
+                
+                if minimal_response:
+                    response_data = transform_to_minimal(cached_result, normalized_url, cached=True)
+                else:
+                    response_data = {
+                        'url': normalized_url,
+                        'cached': True,
+                        **cached_result
+                    }
+                return jsonify(response_data)
 
         # Analyze with humble (with automatic protocol fallback)
         logger.info(f"Analyzing URL with humble: {normalized_url}")
@@ -183,11 +190,15 @@ def analyze_url():
         if analysis_result.get('success'):
             cache_service.set(normalized_url, analysis_result['data'])
 
-            return jsonify({
-                'url': normalized_url,
-                'cached': False,
-                **analysis_result['data']
-            })
+            if minimal_response:
+                response_data = transform_to_minimal(analysis_result['data'], normalized_url, cached=False)
+            else:
+                response_data = {
+                    'url': normalized_url,
+                    'cached': False,
+                    **analysis_result['data']
+                }
+            return jsonify(response_data)
         else:
             return jsonify({
                 'error': 'Analysis failed',
